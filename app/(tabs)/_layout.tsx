@@ -1,3 +1,4 @@
+import { useAuth } from "@/app/hooks/useAuth";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import SupportChatWidget from "@/components/support/SupportChatWidget";
 import { useTheme } from "@/context/ThemeContext";
@@ -6,6 +7,7 @@ import { DrawerNavigationProp } from "@react-navigation/drawer";
 import { useNavigation } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Animated,
   Image,
@@ -13,7 +15,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useTranslation } from "react-i18next";
 
 function CheshireGif() {
   return (
@@ -209,6 +210,9 @@ function CustomHeader({ title }: { title: string }) {
 export default function Layout() {
   const { theme } = useTheme();
   const { t } = useTranslation();
+  const { isAdmin, isSuperAdmin } = useAuth();
+
+  const showSupportWidget = !isAdmin && !isSuperAdmin;
 
   return (
     <View style={styles.root}>
@@ -344,7 +348,7 @@ export default function Layout() {
         />
       </Drawer>
 
-      <SupportChatWidget />
+      {showSupportWidget && <SupportChatWidget />}
     </View>
   );
 }

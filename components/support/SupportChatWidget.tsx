@@ -17,6 +17,22 @@ import {
   View,
 } from "react-native";
 
+type Chat = {
+  id?: string;
+  chatId?: string;
+  userId?: string;
+  adminId?: string | null;
+  status?: string | number;
+  createdAt?: string;
+  closedAt?: string | null;
+  messages?: any;
+  user?: {
+    id?: string;
+    userName?: string;
+    username?: string;
+  };
+};
+
 type Message = {
   id?: string;
   text?: string;
@@ -24,9 +40,6 @@ type Message = {
   content?: string;
   senderId?: string;
   userId?: string;
-  senderName?: string;
-  userName?: string;
-  username?: string;
   createdAt?: string;
   sentAt?: string;
 };
@@ -41,23 +54,12 @@ function authH(token: string | null) {
 async function readResponse(res: Response) {
   const text = await res.text();
 
-  if (!text) {
-    return {
-      text: "",
-      data: null,
-    };
-  }
+  if (!text) return { text: "", data: null };
 
   try {
-    return {
-      text,
-      data: JSON.parse(text),
-    };
+    return { text, data: JSON.parse(text) };
   } catch {
-    return {
-      text,
-      data: null,
-    };
+    return { text, data: null };
   }
 }
 
@@ -68,29 +70,28 @@ function unwrapArray(data: any): any[] {
   if (Array.isArray(data?.data?.$values)) return data.data.$values;
   if (Array.isArray(data?.messages)) return data.messages;
   if (Array.isArray(data?.messages?.$values)) return data.messages.$values;
-  if (Array.isArray(data?.data?.messages)) return data.data.messages;
-  if (Array.isArray(data?.data?.messages?.$values)) {
-    return data.data.messages.$values;
-  }
-
   return [];
 }
 
 function getChatId(chat: any): string {
-  return String(
-    chat?.chatId ?? chat?.id ?? chat?.data?.chatId ?? chat?.data?.id ?? "",
-  );
+  return String(chat?.id ?? chat?.chatId ?? "");
+}
+
+function isClosedChat(chat: any): boolean {
+  const status = String(chat?.status ?? "").toLowerCase();
+  return chat?.closedAt != null || status === "closed";
 }
 
 function normalizeMessages(data: any): Message[] {
-  return unwrapArray(data).map((m: any, index: number) => ({
-    id: String(m.id ?? m.messageId ?? `${index}-${m.createdAt ?? Date.now()}`),
-    text: m.text ?? m.message ?? m.content ?? "",
-    senderId: m.senderId ?? m.userId ?? m.senderUserId ?? "",
-    userId: m.userId,
-    senderName: m.senderName ?? m.userName ?? m.username ?? "",
-    createdAt: m.createdAt ?? m.sentAt ?? m.date ?? "",
-  }));
+  return unwrapArray(data)
+    .filter((x) => x && !x.$ref)
+    .map((m: any, index: number) => ({
+      id: String(m.id ?? m.messageId ?? `${index}-${m.sentAt ?? Date.now()}`),
+      text: m.text ?? m.message ?? m.content ?? "",
+      senderId: m.senderId ?? "",
+      userId: m.userId,
+      createdAt: m.createdAt ?? m.sentAt ?? "",
+    }));
 }
 
 function cleanError(text: string, fallback: string) {
@@ -98,25 +99,38 @@ function cleanError(text: string, fallback: string) {
 
   try {
     const json = JSON.parse(text);
-
-    if (json.errors) {
-      const messages = Object.values(json.errors).flat().join("\n");
-      return messages || json.title || fallback;
-    }
-
-    return json.title || json.message || text;
+    return json.title || json.message || fallback;
   } catch {
-    return text;
+    return text || fallback;
   }
+}
+
+function pickActiveUserChat(data: any): Chat | null {
+  const chats = unwrapArray(data).filter((x) => x && !x.$ref && getChatId(x));
+
+  if (chats.length === 0) return null;
+
+  const waitingChats = chats.filter((chat) => {
+    const status = Number(chat?.status);
+    return !isClosedChat(chat) && status === 1;
+  });
+
+  if (waitingChats.length === 0) return null;
+
+  return waitingChats.sort(
+    (a, b) =>
+      new Date(b.createdAt ?? 0).getTime() -
+      new Date(a.createdAt ?? 0).getTime(),
+  )[0];
 }
 
 export default function SupportChatWidget() {
   const { theme } = useTheme();
-  const { token, userId, username } = useAuth();
+  const { token, userId, isAdmin, isSuperAdmin } = useAuth();
 
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
-  const [chatId, setChatId] = useState<string | null>(null);
+  const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -126,6 +140,7 @@ export default function SupportChatWidget() {
   const catFloat = useRef(new Animated.Value(0)).current;
   const listRef = useRef<FlatList<Message>>(null);
 
+  const chatId = getChatId(chat);
   const isLoggedIn = !!token;
 
   const bubbleText = useMemo(() => {
@@ -151,14 +166,14 @@ export default function SupportChatWidget() {
   }, [catFloat]);
 
   useEffect(() => {
-    if (!open || !chatId || !token) return;
+    if (!open || !chatId || !token || isAdmin || isSuperAdmin) return;
 
     const interval = setInterval(() => {
       loadMessages(chatId, false);
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [open, chatId, token]);
+  }, [open, chatId, token, isAdmin, isSuperAdmin]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -168,12 +183,16 @@ export default function SupportChatWidget() {
     }
   }, [messages.length]);
 
+  if (isAdmin || isSuperAdmin) {
+    return null;
+  }
+
   const translateY = catFloat.interpolate({
     inputRange: [0, 1],
     outputRange: [0, -5],
   });
 
-  const loadMyChat = async (): Promise<string | null> => {
+  async function getMyChat(): Promise<Chat | null> {
     if (!token) return null;
 
     const res = await fetch(`${API_URL}/api/chat/my`, {
@@ -184,22 +203,14 @@ export default function SupportChatWidget() {
     const { text, data } = await readResponse(res);
 
     if (!res.ok) {
-      throw new Error(
-        cleanError(text, `Failed to load chat. Status ${res.status}`),
-      );
+      throw new Error(cleanError(text, `Failed to load chat ${res.status}`));
     }
 
-    const chats = unwrapArray(data);
+    return pickActiveUserChat(data);
+  }
 
-    if (chats.length > 0) {
-      return getChatId(chats[0]);
-    }
-
-    return null;
-  };
-
-  const createChat = async (): Promise<string | null> => {
-    if (!token) return null;
+  async function createChat(): Promise<Chat> {
+    if (!token) throw new Error("Token not found.");
 
     const res = await fetch(`${API_URL}/api/chat/create`, {
       method: "POST",
@@ -209,19 +220,17 @@ export default function SupportChatWidget() {
     const { text, data } = await readResponse(res);
 
     if (!res.ok) {
-      throw new Error(
-        cleanError(text, `Failed to create chat. Status ${res.status}`),
-      );
+      throw new Error(cleanError(text, `Failed to create chat ${res.status}`));
     }
 
-    const createdId = getChatId(data);
+    if (!getChatId(data)) {
+      throw new Error("Created chat has no id.");
+    }
 
-    if (createdId) return createdId;
+    return data;
+  }
 
-    return await loadMyChat();
-  };
-
-  const loadMessages = async (id: string, showError = true) => {
+  async function loadMessages(id: string, showError = true) {
     if (!token) return;
 
     try {
@@ -234,7 +243,7 @@ export default function SupportChatWidget() {
 
       if (!res.ok) {
         throw new Error(
-          cleanError(text, `Failed to load messages. Status ${res.status}`),
+          cleanError(text, `Failed to load messages ${res.status}`),
         );
       }
 
@@ -244,10 +253,10 @@ export default function SupportChatWidget() {
         setError(e?.message || "Failed to load messages.");
       }
     }
-  };
+  }
 
-  const openChat = async () => {
-    if (!isLoggedIn) {
+  async function openChat() {
+    if (!token) {
       setOpen(true);
       setError("Please sign in to use support chat.");
       return;
@@ -259,48 +268,51 @@ export default function SupportChatWidget() {
       setLoading(true);
       setError("");
 
-      let id = await loadMyChat();
+      let currentChat = await getMyChat();
 
-      if (!id) {
-        id = await createChat();
+      if (!currentChat) {
+        currentChat = await createChat();
       }
 
-      if (!id) {
-        throw new Error("Chat was not created.");
-      }
+      setChat(currentChat);
 
-      setChatId(id);
+      const id = getChatId(currentChat);
       await loadMessages(id);
     } catch (e: any) {
       setError(e?.message || "Something went wrong.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const closeChat = () => {
+  function closeChatWindow() {
     setOpen(false);
-  };
+    setChat(null);
+    setMessages([]);
+    setInput("");
+    setError("");
+  }
 
-  const hideWidget = () => {
+  function hideWidget() {
     setHidden(true);
     setOpen(false);
-  };
+  }
 
-  const sendMessage = async () => {
+  async function sendMessage() {
     const text = input.trim();
+    const id = getChatId(chat);
 
-    if (!text || !chatId || !token) return;
+    if (!text || !id || !token) return;
 
     try {
       setSending(true);
-      setError("");
       setInput("");
+      setError("");
 
       const optimistic: Message = {
         id: `local-${Date.now()}`,
         text,
-        senderId: userId ?? username ?? "me",
+        senderId: chat?.userId ?? userId ?? "me",
         createdAt: new Date().toISOString(),
       };
 
@@ -310,7 +322,7 @@ export default function SupportChatWidget() {
         method: "POST",
         headers: authH(token),
         body: JSON.stringify({
-          chatId,
+          chatId: id,
           text,
         }),
       });
@@ -318,38 +330,32 @@ export default function SupportChatWidget() {
       const { text: responseText } = await readResponse(res);
 
       if (!res.ok) {
-        throw new Error(
-          cleanError(responseText, `Send failed. Status ${res.status}`),
-        );
+        throw new Error(cleanError(responseText, `Send failed ${res.status}`));
       }
 
-      await loadMessages(chatId, false);
+      await loadMessages(id, false);
     } catch (e: any) {
       setError(e?.message || "Message was not sent.");
     } finally {
       setSending(false);
     }
-  };
+  }
 
   const renderMessage = ({ item }: { item: Message }) => {
     const messageText = item.text ?? item.message ?? item.content ?? "";
 
-    const currentUser =
-      item.senderId === userId ||
-      item.userId === userId ||
-      item.senderName === username ||
-      item.userName === username ||
-      item.username === username ||
+    const isMine =
+      (!!chat?.userId && item.senderId === chat.userId) ||
       item.senderId === "me";
 
     return (
       <View
         style={[
           styles.messageRow,
-          currentUser ? styles.messageRowMe : styles.messageRowOther,
+          isMine ? styles.messageRowMe : styles.messageRowOther,
         ]}
       >
-        {!currentUser && (
+        {!isMine && (
           <View style={[styles.smallIcon, { backgroundColor: theme.accentBg }]}>
             <Ionicons name="paw-outline" size={15} color={theme.accent} />
           </View>
@@ -359,14 +365,14 @@ export default function SupportChatWidget() {
           style={[
             styles.messageBubble,
             {
-              backgroundColor: currentUser ? theme.accent : theme.bg3,
-              borderColor: currentUser ? theme.accent : theme.border,
+              backgroundColor: isMine ? theme.accent : theme.bg3,
+              borderColor: isMine ? theme.accent : theme.border,
             },
           ]}
         >
           <Text
             style={{
-              color: currentUser ? "white" : theme.text,
+              color: isMine ? "white" : theme.text,
               fontSize: 14,
               lineHeight: 20,
             }}
@@ -485,13 +491,7 @@ export default function SupportChatWidget() {
             </View>
 
             <View style={styles.header}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 10,
-                }}
-              >
+              <View style={styles.headerLeft}>
                 <View
                   style={[
                     styles.headerCat,
@@ -516,7 +516,7 @@ export default function SupportChatWidget() {
                 </View>
               </View>
 
-              <TouchableOpacity onPress={closeChat}>
+              <TouchableOpacity onPress={closeChatWindow}>
                 <Ionicons name="close-outline" size={26} color={theme.text2} />
               </TouchableOpacity>
             </View>
@@ -542,16 +542,14 @@ export default function SupportChatWidget() {
                   {error}
                 </Text>
 
-                {isLoggedIn && (
-                  <TouchableOpacity
-                    style={[styles.retryBtn, { backgroundColor: theme.accent }]}
-                    onPress={openChat}
-                  >
-                    <Text style={{ color: "white", fontWeight: "700" }}>
-                      Try again
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={[styles.retryBtn, { backgroundColor: theme.accent }]}
+                  onPress={openChat}
+                >
+                  <Text style={{ color: "white", fontWeight: "700" }}>
+                    Try again
+                  </Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <>
@@ -646,10 +644,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
   },
 
   catBubble: {
@@ -662,10 +656,6 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
     paddingRight: 8,
     paddingVertical: 9,
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
   },
 
   catFace: {
@@ -724,6 +714,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingBottom: 14,
     zIndex: 2,
+  },
+
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
 
   headerCat: {

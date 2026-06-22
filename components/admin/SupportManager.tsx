@@ -18,10 +18,18 @@ type Chat = {
   id?: string;
   chatId?: string;
   userId?: string;
+  adminId?: string | null;
   userName?: string;
   username?: string;
-  status?: string;
+  user?: {
+    id?: string;
+    userName?: string;
+    username?: string;
+  };
+  admin?: any;
+  status?: string | number;
   createdAt?: string;
+  closedAt?: string | null;
   messages?: any;
 };
 
@@ -32,9 +40,6 @@ type Message = {
   content?: string;
   senderId?: string;
   userId?: string;
-  senderName?: string;
-  userName?: string;
-  username?: string;
   createdAt?: string;
   sentAt?: string;
 };
@@ -50,13 +55,22 @@ async function readResponse(res: Response) {
   const text = await res.text();
 
   if (!text) {
-    return { text: "", data: null };
+    return {
+      text: "",
+      data: null,
+    };
   }
 
   try {
-    return { text, data: JSON.parse(text) };
+    return {
+      text,
+      data: JSON.parse(text),
+    };
   } catch {
-    return { text, data: null };
+    return {
+      text,
+      data: null,
+    };
   }
 }
 
@@ -67,18 +81,12 @@ function unwrapArray(data: any): any[] {
   if (Array.isArray(data?.data?.$values)) return data.data.$values;
   if (Array.isArray(data?.messages)) return data.messages;
   if (Array.isArray(data?.messages?.$values)) return data.messages.$values;
-  if (Array.isArray(data?.data?.messages)) return data.data.messages;
-  if (Array.isArray(data?.data?.messages?.$values)) {
-    return data.data.messages.$values;
-  }
 
   return [];
 }
 
 function getChatId(chat: any): string {
-  return String(
-    chat?.chatId ?? chat?.id ?? chat?.data?.chatId ?? chat?.data?.id ?? "",
-  );
+  return String(chat?.id ?? chat?.chatId ?? "");
 }
 
 function getChatUser(chat: any): string {
@@ -92,15 +100,36 @@ function getChatUser(chat: any): string {
   );
 }
 
+function isClosedChat(chat: any): boolean {
+  const status = String(chat?.status ?? "").toLowerCase();
+
+  return chat?.closedAt != null || status === "closed";
+}
+
+function normalizeChats(data: any): Chat[] {
+  return unwrapArray(data).filter((chat) => {
+    if (!chat || chat.$ref) return false;
+    if (!getChatId(chat)) return false;
+    if (isClosedChat(chat)) return false;
+
+    return true;
+  });
+}
+
 function normalizeMessages(data: any): Message[] {
-  return unwrapArray(data).map((m: any, index: number) => ({
-    id: String(m.id ?? m.messageId ?? `${index}-${m.createdAt ?? Date.now()}`),
-    text: m.text ?? m.message ?? m.content ?? "",
-    senderId: m.senderId ?? m.userId ?? m.senderUserId ?? "",
-    userId: m.userId,
-    senderName: m.senderName ?? m.userName ?? m.username ?? "",
-    createdAt: m.createdAt ?? m.sentAt ?? m.date ?? "",
-  }));
+  return unwrapArray(data)
+    .filter((message) => message && !message.$ref)
+    .map((message: any, index: number) => ({
+      id: String(
+        message.id ??
+          message.messageId ??
+          `${index}-${message.sentAt ?? Date.now()}`,
+      ),
+      text: message.text ?? message.message ?? message.content ?? "",
+      senderId: message.senderId ?? "",
+      userId: message.userId,
+      createdAt: message.createdAt ?? message.sentAt ?? "",
+    }));
 }
 
 function cleanError(text: string, fallback: string) {
@@ -114,15 +143,15 @@ function cleanError(text: string, fallback: string) {
       return messages || json.title || fallback;
     }
 
-    return json.title || json.message || text;
+    return json.title || json.message || fallback;
   } catch {
-    return text;
+    return text || fallback;
   }
 }
 
 export default function SupportManager() {
   const { theme } = useTheme();
-  const { token, userId, username } = useAuth();
+  const { token, userId } = useAuth();
 
   const [waitingChats, setWaitingChats] = useState<Chat[]>([]);
   const [myChats, setMyChats] = useState<Chat[]>([]);
@@ -130,9 +159,11 @@ export default function SupportManager() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
   const [sending, setSending] = useState(false);
+
+  const [closeModal, setCloseModal] = useState(false);
 
   const [messageModal, setMessageModal] = useState({
     visible: false,
@@ -140,8 +171,6 @@ export default function SupportManager() {
     message: "",
     type: "success" as "success" | "error",
   });
-
-  const [closeModal, setCloseModal] = useState(false);
 
   const listRef = useRef<FlatList<Message>>(null);
 
@@ -158,7 +187,7 @@ export default function SupportManager() {
     });
   };
 
-  const loadWaitingChats = async () => {
+  async function loadWaitingChats() {
     if (!token) return;
 
     const res = await fetch(`${API_URL}/api/chat/waiting`, {
@@ -174,10 +203,10 @@ export default function SupportManager() {
       );
     }
 
-    setWaitingChats(unwrapArray(data));
-  };
+    setWaitingChats(normalizeChats(data));
+  }
 
-  const loadMyChats = async () => {
+  async function loadMyChats() {
     if (!token) return;
 
     const res = await fetch(`${API_URL}/api/chat/my`, {
@@ -193,35 +222,31 @@ export default function SupportManager() {
       );
     }
 
-    setMyChats(unwrapArray(data));
-  };
+    setMyChats(normalizeChats(data));
+  }
 
-  const loadAll = async () => {
-    try {
-      setLoading(true);
+  async function loadChatById(chatId: string): Promise<Chat | null> {
+    if (!token) return null;
 
-      if (!token) {
-        showMessage(
-          "Unauthorized",
-          "Token not found. Please sign in again.",
-          "error",
-        );
-        return;
-      }
+    const res = await fetch(`${API_URL}/api/chat/${chatId}`, {
+      method: "GET",
+      headers: authH(token),
+    });
 
-      await Promise.all([loadWaitingChats(), loadMyChats()]);
-    } catch (e: any) {
-      showMessage(
-        "Error",
-        e?.message || "Failed to load support chats.",
-        "error",
+    const { text, data } = await readResponse(res);
+
+    if (!res.ok) {
+      throw new Error(
+        cleanError(text, `Failed to load chat. Status ${res.status}`),
       );
-    } finally {
-      setLoading(false);
     }
-  };
 
-  const loadMessages = async (chatId: string, showErr = true) => {
+    if (!data || isClosedChat(data)) return null;
+
+    return data;
+  }
+
+  async function loadMessages(chatId: string, showError = true) {
     if (!token) return;
 
     try {
@@ -244,14 +269,35 @@ export default function SupportManager() {
         listRef.current?.scrollToEnd({ animated: true });
       }, 120);
     } catch (e: any) {
-      if (showErr) {
+      if (showError) {
         showMessage("Error", e?.message || "Failed to load messages.", "error");
       }
     }
-  };
+  }
 
-  const takeChat = async (chat: Chat) => {
+  async function loadAll() {
+    if (!token) {
+      showMessage("Unauthorized", "Please sign in again.", "error");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await Promise.all([loadWaitingChats(), loadMyChats()]);
+    } catch (e: any) {
+      showMessage(
+        "Error",
+        e?.message || "Failed to load support chats.",
+        "error",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function takeChat(chat: Chat) {
     const chatId = getChatId(chat);
+
     if (!chatId || !token) return;
 
     try {
@@ -273,7 +319,9 @@ export default function SupportManager() {
         );
       }
 
-      setActiveChat(chat);
+      const freshChat = await loadChatById(chatId);
+
+      setActiveChat(freshChat ?? chat);
       await loadMessages(chatId);
       await loadAll();
     } catch (e: any) {
@@ -281,22 +329,43 @@ export default function SupportManager() {
     } finally {
       setChatLoading(false);
     }
-  };
+  }
 
-  const openChat = async (chat: Chat) => {
+  async function openChat(chat: Chat) {
     const chatId = getChatId(chat);
+
     if (!chatId) return;
 
     try {
       setChatLoading(true);
-      setActiveChat(chat);
+
+      const freshChat = await loadChatById(chatId);
+
+      if (!freshChat) {
+        await loadAll();
+        showMessage("Closed", "This chat is already closed.", "error");
+        return;
+      }
+
+      setActiveChat(freshChat);
       await loadMessages(chatId);
+    } catch (e: any) {
+      showMessage("Error", e?.message || "Failed to open chat.", "error");
     } finally {
       setChatLoading(false);
     }
-  };
+  }
 
-  const sendMessage = async () => {
+  async function exitChat() {
+    setActiveChat(null);
+    setMessages([]);
+    setInput("");
+    setCloseModal(false);
+
+    await loadAll();
+  }
+
+  async function sendMessage() {
     const chatId = getChatId(activeChat);
     const text = input.trim();
 
@@ -309,8 +378,7 @@ export default function SupportManager() {
       const optimistic: Message = {
         id: `admin-local-${Date.now()}`,
         text,
-        senderId: userId ?? username ?? "admin",
-        senderName: username ?? "Admin",
+        senderId: activeChat?.adminId ?? userId ?? "admin",
         createdAt: new Date().toISOString(),
       };
 
@@ -329,7 +397,10 @@ export default function SupportManager() {
 
       if (!res.ok) {
         throw new Error(
-          cleanError(responseText, `Send failed. Status ${res.status}`),
+          cleanError(
+            responseText,
+            `Message was not sent. Status ${res.status}`,
+          ),
         );
       }
 
@@ -339,10 +410,11 @@ export default function SupportManager() {
     } finally {
       setSending(false);
     }
-  };
+  }
 
-  const closeChat = async () => {
+  async function closeChatTicket() {
     const chatId = getChatId(activeChat);
+
     if (!chatId || !token) return;
 
     try {
@@ -357,53 +429,55 @@ export default function SupportManager() {
       const { text } = await readResponse(res);
 
       if (!res.ok) {
-        throw new Error(cleanError(text, `Close failed. Status ${res.status}`));
+        throw new Error(
+          cleanError(text, `Failed to close chat. Status ${res.status}`),
+        );
       }
 
       setCloseModal(false);
       setActiveChat(null);
       setMessages([]);
-      showMessage("Closed", "Chat closed successfully.");
+      setInput("");
+
+      showMessage("Closed", "Support ticket was closed successfully.");
       await loadAll();
     } catch (e: any) {
-      showMessage("Error", e?.message || "Failed to close chat.", "error");
+      showMessage("Error", e?.message || "Failed to close ticket.", "error");
     }
-  };
+  }
 
   useEffect(() => {
     loadAll();
   }, [token]);
 
   useEffect(() => {
-    if (!activeChat) return;
-
     const chatId = getChatId(activeChat);
-    if (!chatId) return;
+
+    if (!chatId || !token) return;
 
     const interval = setInterval(() => {
       loadMessages(chatId, false);
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [activeChat?.id, activeChat?.chatId, token]);
+  }, [activeChat, token]);
 
   const renderMessage = ({ item }: { item: Message }) => {
     const text = item.text ?? item.message ?? item.content ?? "";
 
     const isAdminMessage =
-      item.senderId === userId ||
-      item.userId === userId ||
-      item.senderName === username ||
-      item.userName === username ||
-      item.username === username ||
-      item.senderName?.toLowerCase?.().includes("admin") ||
+      (!!activeChat?.adminId && item.senderId === activeChat.adminId) ||
+      (!activeChat?.adminId &&
+        !!activeChat?.userId &&
+        !!item.senderId &&
+        item.senderId !== activeChat.userId) ||
       item.senderId === "admin";
 
     return (
       <View style={[s.msgRow, isAdminMessage ? s.msgRowMe : s.msgRowOther]}>
         {!isAdminMessage && (
           <View style={[s.customerIcon, { backgroundColor: theme.accentBg }]}>
-            <Text style={{ fontSize: 15 }}>🐾</Text>
+            <Ionicons name="paw-outline" size={15} color={theme.accent} />
           </View>
         )}
 
@@ -438,6 +512,7 @@ export default function SupportManager() {
               <Text style={[s.title, { color: theme.text }]}>
                 Support Chats
               </Text>
+
               <Text style={[s.sub, { color: theme.text3 }]}>
                 Waiting: {waitingChats.length} · My chats: {myChats.length}
               </Text>
@@ -454,6 +529,7 @@ export default function SupportManager() {
           {loading ? (
             <View style={s.center}>
               <ActivityIndicator color={theme.accent} />
+
               <Text style={{ color: theme.text3, marginTop: 10 }}>
                 Loading support chats...
               </Text>
@@ -462,15 +538,20 @@ export default function SupportManager() {
             <FlatList
               data={[
                 { type: "section", title: "Waiting Chats" },
-                ...waitingChats.map((x) => ({ type: "waiting", chat: x })),
+                ...waitingChats.map((chat) => ({
+                  type: "waiting",
+                  chat,
+                })),
                 { type: "section", title: "My Chats" },
-                ...myChats.map((x) => ({ type: "my", chat: x })),
+                ...myChats.map((chat) => ({
+                  type: "my",
+                  chat,
+                })),
               ]}
-              keyExtractor={(item: any, index) =>
-                item.type === "section"
-                  ? `${item.title}-${index}`
-                  : `${item.type}-${getChatId(item.chat)}-${index}`
-              }
+              keyExtractor={(item: any, index) => {
+                if (item.type === "section") return `${item.title}-${index}`;
+                return `${item.type}-${getChatId(item.chat)}-${index}`;
+              }}
               contentContainerStyle={{ paddingBottom: 40 }}
               renderItem={({ item }: any) => {
                 if (item.type === "section") {
@@ -481,7 +562,7 @@ export default function SupportManager() {
                   );
                 }
 
-                const chat = item.chat;
+                const chat: Chat = item.chat;
                 const chatId = getChatId(chat);
                 const user = getChatUser(chat);
 
@@ -489,19 +570,27 @@ export default function SupportManager() {
                   <View
                     style={[
                       s.chatCard,
-                      { backgroundColor: theme.bg2, borderColor: theme.border },
+                      {
+                        backgroundColor: theme.bg2,
+                        borderColor: theme.border,
+                      },
                     ]}
                   >
                     <View
                       style={[s.catIcon, { backgroundColor: theme.accentBg }]}
                     >
-                      <Text style={{ fontSize: 20 }}>🐈‍⬛</Text>
+                      <Ionicons
+                        name="chatbubble-ellipses-outline"
+                        size={20}
+                        color={theme.accent}
+                      />
                     </View>
 
                     <View style={{ flex: 1 }}>
                       <Text style={[s.chatTitle, { color: theme.text }]}>
                         {user}
                       </Text>
+
                       <Text style={[s.chatSub, { color: theme.text3 }]}>
                         Chat #{chatId.slice(0, 8)}
                       </Text>
@@ -533,7 +622,8 @@ export default function SupportManager() {
               }}
               ListEmptyComponent={
                 <View style={s.center}>
-                  <Text style={{ fontSize: 34 }}>🐾</Text>
+                  <Ionicons name="paw-outline" size={34} color={theme.accent} />
+
                   <Text style={[s.emptyTitle, { color: theme.text }]}>
                     No support chats yet
                   </Text>
@@ -546,11 +636,8 @@ export default function SupportManager() {
         <>
           <View style={s.chatHeader}>
             <TouchableOpacity
-              style={[s.backBtn, { backgroundColor: theme.accentBg }]}
-              onPress={() => {
-                setActiveChat(null);
-                setMessages([]);
-              }}
+              style={[s.headerBtn, { backgroundColor: theme.accentBg }]}
+              onPress={exitChat}
             >
               <Ionicons
                 name="chevron-back-outline"
@@ -563,6 +650,7 @@ export default function SupportManager() {
               <Text style={[s.title, { color: theme.text }]}>
                 {getChatUser(activeChat)}
               </Text>
+
               <Text style={[s.sub, { color: theme.text3 }]}>
                 Chat #{getChatId(activeChat).slice(0, 8)}
               </Text>
@@ -570,12 +658,12 @@ export default function SupportManager() {
 
             <TouchableOpacity
               style={[
-                s.closeBtn,
+                s.headerBtn,
                 { backgroundColor: "rgba(248,113,113,0.12)" },
               ]}
               onPress={() => setCloseModal(true)}
             >
-              <Ionicons name="close-circle-outline" size={21} color="#f87171" />
+              <Ionicons name="close-circle-outline" size={22} color="#f87171" />
             </TouchableOpacity>
           </View>
 
@@ -594,7 +682,12 @@ export default function SupportManager() {
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
                   <View style={s.center}>
-                    <Text style={{ fontSize: 34 }}>🐈‍⬛</Text>
+                    <Ionicons
+                      name="paw-outline"
+                      size={34}
+                      color={theme.accent}
+                    />
+
                     <Text style={[s.emptyTitle, { color: theme.text }]}>
                       No messages yet
                     </Text>
@@ -605,7 +698,10 @@ export default function SupportManager() {
               <View
                 style={[
                   s.inputRow,
-                  { backgroundColor: theme.bg2, borderColor: theme.border },
+                  {
+                    backgroundColor: theme.bg2,
+                    borderColor: theme.border,
+                  },
                 ]}
               >
                 <TextInput
@@ -644,24 +740,30 @@ export default function SupportManager() {
           <View
             style={[
               s.modalBox,
-              { backgroundColor: theme.bg2, borderColor: theme.border },
+              {
+                backgroundColor: theme.bg2,
+                borderColor: theme.border,
+              },
             ]}
           >
             <View
               style={[
                 s.modalIcon,
-                { backgroundColor: "rgba(248,113,113,0.12)" },
+                {
+                  backgroundColor: "rgba(248,113,113,0.12)",
+                },
               ]}
             >
               <Ionicons name="close-circle-outline" size={32} color="#f87171" />
             </View>
 
             <Text style={[s.modalTitle, { color: theme.text }]}>
-              Close chat?
+              Close this ticket?
             </Text>
 
             <Text style={[s.modalText, { color: theme.text2 }]}>
-              This support chat will be closed.
+              This will close the support ticket. Use the back button if you
+              only want to leave this chat.
             </Text>
 
             <View style={s.btns}>
@@ -676,9 +778,11 @@ export default function SupportManager() {
 
               <TouchableOpacity
                 style={[s.btn, { backgroundColor: "#ef4444" }]}
-                onPress={closeChat}
+                onPress={closeChatTicket}
               >
-                <Text style={{ color: "white", fontWeight: "700" }}>Close</Text>
+                <Text style={{ color: "white", fontWeight: "700" }}>
+                  Close ticket
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -690,7 +794,10 @@ export default function SupportManager() {
           <View
             style={[
               s.modalBox,
-              { backgroundColor: theme.bg2, borderColor: theme.border },
+              {
+                backgroundColor: theme.bg2,
+                borderColor: theme.border,
+              },
             ]}
           >
             <View
@@ -726,7 +833,10 @@ export default function SupportManager() {
             <TouchableOpacity
               style={[s.fullBtn, { backgroundColor: theme.accent }]}
               onPress={() =>
-                setMessageModal((prev) => ({ ...prev, visible: false }))
+                setMessageModal((prev) => ({
+                  ...prev,
+                  visible: false,
+                }))
               }
             >
               <Text style={{ color: "white", fontWeight: "700" }}>Okay</Text>
@@ -828,15 +938,7 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
 
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  closeBtn: {
+  headerBtn: {
     width: 38,
     height: 38,
     borderRadius: 14,
