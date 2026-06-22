@@ -1,3 +1,5 @@
+import SupportChatWidget from "@/components/support/SupportChatWidget";
+import { useTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
 import { useNavigation } from "expo-router";
@@ -5,13 +7,31 @@ import { Drawer } from "expo-router/drawer";
 import { useRef, useState } from "react";
 import {
   Animated,
+  Image,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
 
-function BurgerButton({ onPress }: { onPress: () => void }) {
+function CheshireGif() {
+  return (
+    <View style={styles.gifWrap}>
+      <Image
+        source={require("../../assets/images/cheshire.gif")}
+        style={styles.cheshireGif}
+        resizeMode="cover"
+      />
+    </View>
+  );
+}
+
+function BurgerButton({
+  onPress,
+  lineColor,
+}: {
+  onPress: () => void;
+  lineColor: string;
+}) {
   const [open, setOpen] = useState(false);
   const mid = useRef(new Animated.Value(1)).current;
   const topRot = useRef(new Animated.Value(0)).current;
@@ -87,6 +107,7 @@ function BurgerButton({ onPress }: { onPress: () => void }) {
     inputRange: [0, 1],
     outputRange: ["0deg", "45deg"],
   });
+
   const botRotDeg = botRot.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "-45deg"],
@@ -101,14 +122,30 @@ function BurgerButton({ onPress }: { onPress: () => void }) {
       <Animated.View
         style={[
           styles.line,
-          { transform: [{ translateY: topY }, { rotate: topRotDeg }] },
+          {
+            backgroundColor: lineColor,
+            transform: [{ translateY: topY }, { rotate: topRotDeg }],
+          },
         ]}
       />
-      <Animated.View style={[styles.line, { opacity: mid }]} />
+
       <Animated.View
         style={[
           styles.line,
-          { transform: [{ translateY: botY }, { rotate: botRotDeg }] },
+          {
+            backgroundColor: lineColor,
+            opacity: mid,
+          },
+        ]}
+      />
+
+      <Animated.View
+        style={[
+          styles.line,
+          {
+            backgroundColor: lineColor,
+            transform: [{ translateY: botY }, { rotate: botRotDeg }],
+          },
         ]}
       />
     </TouchableOpacity>
@@ -117,177 +154,261 @@ function BurgerButton({ onPress }: { onPress: () => void }) {
 
 function CustomHeader({ title }: { title: string }) {
   const navigation = useNavigation<DrawerNavigationProp<any>>();
+  const { theme, toggleTheme } = useTheme();
 
   return (
-    <View style={styles.header}>
-      <BurgerButton onPress={() => navigation.openDrawer()} />
-      <Text style={styles.headerTitle}>{title}</Text>
+    <View
+      style={[
+        styles.header,
+        {
+          backgroundColor: theme.headerBg,
+          borderBottomColor: theme.border,
+        },
+      ]}
+    >
+      <BurgerButton
+        onPress={() => navigation.openDrawer()}
+        lineColor={theme.text}
+      />
+
       <TouchableOpacity
-        style={styles.iconBtn}
-        onPress={() => navigation.navigate("profile")}
+        onPress={() => navigation.navigate("index" as any)}
+        activeOpacity={0.8}
+        style={styles.logoBtn}
       >
-        <Ionicons name="person-outline" size={24} color="white" />
+        <CheshireGif />
       </TouchableOpacity>
+
+      <View style={styles.headerRight}>
+        <TouchableOpacity
+          style={[styles.iconBtn, { backgroundColor: theme.accentBg }]}
+          onPress={toggleTheme}
+        >
+          <Ionicons
+            name={theme.dark ? "sunny-outline" : "moon-outline"}
+            size={20}
+            color={theme.accent}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.iconBtn, { backgroundColor: theme.accentBg }]}
+          onPress={() => navigation.navigate("profile")}
+        >
+          <Ionicons name="person-outline" size={20} color={theme.text} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 export default function Layout() {
-  return (
-    <Drawer
-      screenOptions={{
-        headerShown: true,
-        header: ({ options }) => (
-          <CustomHeader title={options.title ?? "Cheshire Shelf"} />
-        ),
-        drawerStyle: {
-          backgroundColor: "#13131a",
-          width: 260,
-        },
-        overlayColor: "rgba(0,0,0,0.5)",
-        drawerLabelStyle: {
-          color: "white",
-          fontSize: 16,
-        },
-        drawerActiveTintColor: "#8b5cf6",
-        drawerInactiveTintColor: "#aaa",
-      }}
-    >
-      <Drawer.Screen
-        name="index"
-        options={{
-          title: "Cheshire Shelf",
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
-          ),
-        }}
-      />
-      <Drawer.Screen
-        name="books"
-        options={{
-          title: "Books",
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="book" size={size} color={color} />
-          ),
-        }}
-      />
-      <Drawer.Screen
-        name="about"
-        options={{
-          title: "About Us",
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="information-circle" size={size} color={color} />
-          ),
-        }}
-      />
-      <Drawer.Screen
-        name="contacts"
-        options={{
-          title: "Contacts",
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="call" size={size} color={color} />
-          ),
-        }}
-      />
-      <Drawer.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
-          ),
-        }}
-      />
-      <Drawer.Screen
-        name="wishlist"
-        options={{
-          title: "Wishlist",
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="heart" size={size} color={color} />
-          ),
-        }}
-      />
+  const { theme } = useTheme();
 
-      <Drawer.Screen
-        name="sign-in"
-        options={{
-          title: "Sign In",
-          drawerItemStyle: { display: "none" },
-        }}
-      />
-      <Drawer.Screen
-        name="sign-up"
-        options={{
-          title: "Sign Up",
-          drawerItemStyle: { display: "none" },
-        }}
-      />
-      <Drawer.Screen
-        name="book/[id]"
-        options={{
-          title: "Book",
-          drawerItemStyle: { display: "none" },
-        }}
-      />
-      <Drawer.Screen
-        name="cart"
-        options={{
-          title: "Cart",
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="cart-outline" size={size} color={color} />
+  return (
+    <View style={styles.root}>
+      <Drawer
+        screenOptions={{
+          headerShown: true,
+          header: ({ options }) => (
+            <CustomHeader title={options.title ?? "Cheshire Shelf"} />
           ),
+          drawerStyle: {
+            backgroundColor: theme.drawerBg,
+            width: 260,
+          },
+          overlayColor: "rgba(0,0,0,0.5)",
+          drawerLabelStyle: {
+            color: theme.text,
+            fontSize: 16,
+          },
+          drawerActiveTintColor: theme.accent,
+          drawerInactiveTintColor: theme.text2,
         }}
-      />
-      <Drawer.Screen
-        name="checkout"
-        options={{
-          title: "Checkout",
-          drawerItemStyle: { display: "none" },
-        }}
-      />
-    </Drawer>
+      >
+        <Drawer.Screen
+          name="index"
+          options={{
+            title: "Cheshire Shelf",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="home" size={size} color={color} />
+            ),
+          }}
+        />
+
+        <Drawer.Screen
+          name="books"
+          options={{
+            title: "Books",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="book" size={size} color={color} />
+            ),
+          }}
+        />
+
+        <Drawer.Screen
+          name="about"
+          options={{
+            title: "About Us",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="information-circle" size={size} color={color} />
+            ),
+          }}
+        />
+
+        <Drawer.Screen
+          name="contacts"
+          options={{
+            title: "Contacts",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="call" size={size} color={color} />
+            ),
+          }}
+        />
+
+        <Drawer.Screen
+          name="profile"
+          options={{
+            title: "Profile",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="person" size={size} color={color} />
+            ),
+          }}
+        />
+
+        <Drawer.Screen
+          name="wishlist"
+          options={{
+            title: "Wishlist",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="heart" size={size} color={color} />
+            ),
+          }}
+        />
+
+        <Drawer.Screen
+          name="cart"
+          options={{
+            title: "Cart",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="cart-outline" size={size} color={color} />
+            ),
+          }}
+        />
+
+        <Drawer.Screen
+          name="sign-in"
+          options={{
+            title: "Sign In",
+            drawerItemStyle: { display: "none" },
+          }}
+        />
+
+        <Drawer.Screen
+          name="sign-up"
+          options={{
+            title: "Sign Up",
+            drawerItemStyle: { display: "none" },
+          }}
+        />
+
+        <Drawer.Screen
+          name="book/[id]"
+          options={{
+            title: "Book",
+            drawerItemStyle: { display: "none" },
+          }}
+        />
+
+        <Drawer.Screen
+          name="checkout"
+          options={{
+            title: "Checkout",
+            drawerItemStyle: { display: "none" },
+          }}
+        />
+
+        <Drawer.Screen
+          name="admin"
+          options={{
+            title: "Admin Panel",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="shield-outline" size={size} color={color} />
+            ),
+          }}
+        />
+      </Drawer>
+
+      <SupportChatWidget />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+
   header: {
-    height: 80,
-    backgroundColor: "#0b0b10",
+    height: 72,
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 18,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(139,92,246,0.25)",
   },
-  headerTitle: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "600",
-    letterSpacing: 0.5,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(139,92,246,0.15)",
+
+  logoBtn: {
+    position: "absolute",
+    left: "50%",
+    marginLeft: -34,
+    width: 68,
+    height: 42,
     justifyContent: "center",
     alignItems: "center",
   },
+
+  gifWrap: {
+    width: 68,
+    height: 34,
+    borderRadius: 18,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "transparent",
+  },
+
+  cheshireGif: {
+    width: 86,
+    height: 48,
+    opacity: 0.92,
+  },
+
+  headerRight: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
   burgerBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(139,92,246,0.15)",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: "center",
     alignItems: "center",
     gap: 5,
   },
+
   line: {
     width: 18,
     height: 2,
     borderRadius: 2,
-    backgroundColor: "white",
   },
 });

@@ -1,5 +1,7 @@
+import API_URL from "@/.expo/config/api";
+import { useTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
-import { Link, router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,8 +15,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import API_URL from "../../.expo/config/api";
-
 interface Book {
   id: string;
   title: string;
@@ -30,40 +30,58 @@ interface Genre {
 }
 
 const wishlistStorage = {
+  _key: (): string => {
+    if (Platform.OS !== "web") return "wishlist_guest";
+    const userId = localStorage.getItem("userId") || "guest";
+    return `wishlist_${userId}`;
+  },
   get: (): string[] => {
     if (Platform.OS !== "web") return [];
     try {
-      return JSON.parse(localStorage.getItem("wishlist") || "[]");
+      return JSON.parse(localStorage.getItem(wishlistStorage._key()) || "[]");
     } catch {
       return [];
     }
-  },
-  set: (list: string[]) => {
-    if (Platform.OS === "web")
-      localStorage.setItem("wishlist", JSON.stringify(list));
   },
   toggle: (id: string): boolean => {
     const list = wishlistStorage.get();
     const idx = list.indexOf(id);
     if (idx === -1) {
       list.push(id);
-      wishlistStorage.set(list);
-      return true;
     } else {
       list.splice(idx, 1);
-      wishlistStorage.set(list);
-      return false;
     }
+    if (Platform.OS === "web")
+      localStorage.setItem(wishlistStorage._key(), JSON.stringify(list));
+    return idx === -1;
   },
   isLiked: (id: string): boolean => wishlistStorage.get().includes(id),
 };
 
 function BookCard({ item, isLoggedIn }: { item: Book; isLoggedIn: boolean }) {
+  const { theme } = useTheme();
   const [flipped, setFlipped] = useState(false);
   const [liked, setLiked] = useState(() => wishlistStorage.isLiked(item.id));
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeInfo = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const cardSlide = useRef(new Animated.Value(16)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: false,
+      }),
+      Animated.timing(cardSlide, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, []);
 
   const handleLike = (e: any) => {
     e.stopPropagation?.();
@@ -115,86 +133,126 @@ function BookCard({ item, isLoggedIn }: { item: Book; isLoggedIn: boolean }) {
   };
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      style={styles.card}
-      onPress={() => router.push(`/book/${item.id}` as any)}
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [{ translateY: cardSlide }],
+        width: "48%",
+        marginBottom: 20,
+      }}
     >
-      <Animated.View
+      <TouchableOpacity
+        activeOpacity={0.9}
         style={[
-          styles.imageContainer,
-          { transform: [{ translateY: slideAnim }] },
+          styles.card,
+          { backgroundColor: theme.bg2, borderColor: theme.border },
         ]}
+        onPress={() => router.push(`/book/${item.id}` as any)}
       >
-        <Image source={{ uri: item.imageUrl }} style={styles.image} />
-
-        <View style={styles.priceTag}>
-          <Text style={styles.priceText}>${item.price}</Text>
-        </View>
-
-        {/* ❤️ только залогиненным */}
-        {isLoggedIn && (
-          <TouchableOpacity style={styles.likeBtn} onPress={handleLike}>
-            <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-              <Ionicons
-                name={liked ? "heart" : "heart-outline"}
-                size={18}
-                color={liked ? "#f43f5e" : "white"}
-              />
-            </Animated.View>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity
-          style={styles.flipBtn}
-          onPress={(e) => {
-            e.stopPropagation?.();
-            flip();
-          }}
+        <Animated.View
+          style={[
+            styles.imageContainer,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
         >
-          <Ionicons
-            name={flipped ? "close-outline" : "eye-outline"}
-            size={16}
-            color="white"
-          />
-        </TouchableOpacity>
-      </Animated.View>
+          <Image source={{ uri: item.imageUrl }} style={styles.image} />
 
-      <Animated.View style={[styles.infoPanel, { opacity: fadeInfo }]}>
-        <Text style={styles.infoTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <Text style={styles.infoAuthor}>{item.author}</Text>
-        <View style={styles.genreRow}>
-          <Ionicons name="bookmark-outline" size={11} color="#8b5cf6" />
-          <Text style={styles.infoGenre}> {item.genreName}</Text>
-        </View>
-        <Link href={`/book/${item.id}` as any} asChild>
+          {/* затемнение снизу */}
+          <View style={styles.imageGradient} />
+
+          <View style={styles.priceTag}>
+            <Text style={styles.priceText}>${item.price}</Text>
+          </View>
+
+          {isLoggedIn && (
+            <TouchableOpacity style={styles.likeBtn} onPress={handleLike}>
+              <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+                <Ionicons
+                  name={liked ? "heart" : "heart-outline"}
+                  size={16}
+                  color={liked ? "#f43f5e" : "white"}
+                />
+              </Animated.View>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
-            style={styles.cartBtn}
-            onPress={(e) => e.stopPropagation?.()}
+            style={styles.flipBtn}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              flip();
+            }}
           >
-            <Ionicons name="bag-add-outline" size={14} color="white" />
-            <Text style={styles.cartText}> View book</Text>
+            <Ionicons
+              name={flipped ? "close-outline" : "eye-outline"}
+              size={14}
+              color="white"
+            />
           </TouchableOpacity>
-        </Link>
-      </Animated.View>
+        </Animated.View>
 
-      {!flipped && (
-        <View style={styles.staticInfo}>
-          <Text style={styles.bookTitle} numberOfLines={1}>
+        {/* flip panel */}
+        <Animated.View
+          style={[
+            styles.infoPanel,
+            {
+              opacity: fadeInfo,
+              backgroundColor: theme.dark ? "#1a1025" : "#f0e6ff",
+            },
+          ]}
+        >
+          <Text
+            style={[styles.infoTitle, { color: theme.text }]}
+            numberOfLines={2}
+          >
             {item.title}
           </Text>
-          <Text style={styles.author} numberOfLines={1}>
+          <Text style={[styles.infoAuthor, { color: theme.text2 }]}>
             {item.author}
           </Text>
-        </View>
-      )}
-    </TouchableOpacity>
+          <View style={styles.genreRow}>
+            <Ionicons name="bookmark-outline" size={11} color={theme.accent} />
+            <Text style={[styles.infoGenre, { color: theme.accent }]}>
+              {" "}
+              {item.genreName}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.cartBtn, { backgroundColor: theme.accent }]}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              router.push(`/book/${item.id}` as any);
+            }}
+          >
+            <Ionicons name="arrow-forward-outline" size={14} color="white" />
+            <Text style={styles.cartText}>View book</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* static info */}
+        {!flipped && (
+          <View style={[styles.staticInfo, { backgroundColor: theme.bg2 }]}>
+            <Text
+              style={[styles.bookTitle, { color: theme.text }]}
+              numberOfLines={1}
+            >
+              {item.title}
+            </Text>
+            <Text
+              style={[styles.bookAuthor, { color: theme.text2 }]}
+              numberOfLines={1}
+            >
+              {item.author}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
 export default function Books() {
+  const { theme } = useTheme();
   const [books, setBooks] = useState<Book[]>([]);
   const [filtered, setFiltered] = useState<Book[]>([]);
   const [genres, setGenres] = useState<Genre[]>([]);
@@ -204,7 +262,6 @@ export default function Books() {
   const [error, setError] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // проверяем логин каждый раз при фокусе
   useFocusEffect(
     useCallback(() => {
       if (Platform.OS === "web") {
@@ -223,15 +280,15 @@ export default function Books() {
         ]);
         const booksData = await booksRes.json();
         const genresData = await genresRes.json();
-        const bookList: Book[] = Array.isArray(booksData)
-          ? booksData
-          : (booksData.$values ?? []);
-        const genreList: Genre[] = Array.isArray(genresData)
-          ? genresData
-          : (genresData.$values ?? []);
-        setBooks(bookList);
-        setFiltered(bookList);
-        setGenres(genreList);
+        setBooks(
+          Array.isArray(booksData) ? booksData : (booksData.$values ?? []),
+        );
+        setFiltered(
+          Array.isArray(booksData) ? booksData : (booksData.$values ?? []),
+        );
+        setGenres(
+          Array.isArray(genresData) ? genresData : (genresData.$values ?? []),
+        );
       } catch (e: any) {
         setError(e.message);
       } finally {
@@ -250,46 +307,69 @@ export default function Books() {
           b.author.toLowerCase().includes(search.toLowerCase()),
       );
     }
-    if (selectedGenre) {
+    if (selectedGenre)
       result = result.filter((b) => b.genreName === selectedGenre);
-    }
     setFiltered(result);
   }, [search, selectedGenre, books]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.searchWrapper}>
-        <Ionicons name="search-outline" size={18} color="#555" />
+    <View style={[styles.container, { backgroundColor: theme.bg }]}>
+      {/* SEARCH */}
+      <View
+        style={[
+          styles.searchWrapper,
+          { backgroundColor: theme.bg2, borderColor: theme.border },
+        ]}
+      >
+        <Ionicons name="search-outline" size={18} color={theme.text3} />
         <TextInput
           placeholder="Search by title or author..."
-          placeholderTextColor="#555"
+          placeholderTextColor={theme.text3}
           value={search}
           onChangeText={setSearch}
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: theme.text }]}
         />
         {search.length > 0 && (
           <TouchableOpacity onPress={() => setSearch("")}>
-            <Ionicons name="close-outline" size={20} color="#555" />
+            <Ionicons name="close-outline" size={20} color={theme.text3} />
           </TouchableOpacity>
         )}
       </View>
 
+      {/* GENRES */}
       <FlatList
-        data={genres}
+        data={[{ id: -1, name: "All" }, ...genres]}
         horizontal
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => String(item.id)}
         style={styles.genreList}
         contentContainerStyle={{ paddingRight: 16 }}
         renderItem={({ item }) => {
-          const active = selectedGenre === item.name;
+          const active =
+            item.name === "All" ? !selectedGenre : selectedGenre === item.name;
           return (
             <TouchableOpacity
-              onPress={() => setSelectedGenre(active ? null : item.name)}
-              style={[styles.genreChip, active && styles.genreChipActive]}
+              onPress={() =>
+                setSelectedGenre(
+                  item.name === "All" ? null : active ? null : item.name,
+                )
+              }
+              style={[
+                styles.genreChip,
+                {
+                  backgroundColor: active ? theme.accent : theme.bg2,
+                  borderColor: active ? theme.accent : theme.border,
+                },
+              ]}
             >
               <Text
-                style={[styles.genreText, active && styles.genreTextActive]}
+                style={[
+                  styles.genreText,
+                  {
+                    color: active ? "white" : theme.text2,
+                    fontWeight: active ? "600" : "400",
+                  },
+                ]}
               >
                 {item.name}
               </Text>
@@ -299,26 +379,32 @@ export default function Books() {
       />
 
       {!loading && !error && (
-        <Text style={styles.countText}>
+        <Text style={[styles.countText, { color: theme.text3 }]}>
           {filtered.length} book{filtered.length !== 1 ? "s" : ""} found
         </Text>
       )}
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#8b5cf6" />
-          <Text style={styles.loadingText}>Loading books...</Text>
+          <ActivityIndicator size="large" color={theme.accent} />
+          <Text style={[styles.loadingText, { color: theme.text3 }]}>
+            Loading books...
+          </Text>
         </View>
       ) : error ? (
         <View style={styles.center}>
           <Ionicons name="warning-outline" size={32} color="#f87171" />
-          <Text style={styles.errorText}>{error}</Text>
-          <Text style={styles.errorHint}>Check that the server is running</Text>
+          <Text style={[styles.errorText]}>{error}</Text>
+          <Text style={[styles.errorHint, { color: theme.text3 }]}>
+            Check that the server is running
+          </Text>
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="book-outline" size={40} color="#333" />
-          <Text style={styles.emptyText}>No books found</Text>
+          <Ionicons name="book-outline" size={40} color={theme.text3} />
+          <Text style={[styles.emptyText, { color: theme.text3 }]}>
+            No books found
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -338,65 +424,47 @@ export default function Books() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0b0b10",
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
+  container: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
   searchWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1a1a25",
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "rgba(139,92,246,0.2)",
     gap: 8,
   },
-  searchInput: {
-    flex: 1,
-    color: "white",
-    fontSize: 14,
-  },
-  genreList: {
-    marginBottom: 14,
-    flexGrow: 0,
-  },
+  searchInput: { flex: 1, fontSize: 14 },
+  genreList: { marginBottom: 14, flexGrow: 0 },
   genreChip: {
     paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: 20,
     marginRight: 8,
-    backgroundColor: "#1a1a25",
     borderWidth: 1,
-    borderColor: "rgba(139,92,246,0.2)",
   },
-  genreChipActive: {
-    backgroundColor: "#7c3aed",
-    borderColor: "#7c3aed",
-  },
-  genreText: { color: "#888", fontSize: 13 },
-  genreTextActive: { color: "white", fontWeight: "600" },
-  countText: { color: "#555", fontSize: 12, marginBottom: 12 },
+  genreText: { fontSize: 13 },
+  countText: { fontSize: 12, marginBottom: 12 },
+
+  // CARD
   card: {
-    width: "48%",
+    width: "100%",
     height: 280,
-    marginBottom: 20,
-    borderRadius: 16,
-    backgroundColor: "#13131f",
+    borderRadius: 18,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(139,92,246,0.15)",
   },
-  imageContainer: {
-    width: "100%",
-    height: 220,
-    position: "relative",
-  },
+  imageContainer: { width: "100%", height: 220, position: "relative" },
   image: { width: "100%", height: "100%" },
+  imageGradient: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
   priceTag: {
     position: "absolute",
     top: 8,
@@ -406,15 +474,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  priceText: { color: "white", fontSize: 12, fontWeight: "700" },
+  priceText: { color: "white", fontSize: 11, fontWeight: "700" },
   likeBtn: {
     position: "absolute",
     top: 8,
     left: 8,
-    width: 30,
-    height: 30,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -422,50 +490,44 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 8,
     right: 8,
-    width: 30,
-    height: 30,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "center",
     alignItems: "center",
   },
-  staticInfo: { padding: 8 },
-  bookTitle: { color: "white", fontSize: 12, fontWeight: "600" },
-  author: { color: "#888", fontSize: 11, marginTop: 2 },
+  staticInfo: { padding: 10 },
+  bookTitle: { fontSize: 12, fontWeight: "700" },
+  bookAuthor: { fontSize: 11, marginTop: 2 },
   infoPanel: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     height: 280,
-    backgroundColor: "#1a1025",
     padding: 14,
     justifyContent: "center",
     gap: 6,
   },
-  infoTitle: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "700",
-    lineHeight: 18,
-  },
-  infoAuthor: { color: "#aaa", fontSize: 12 },
+  infoTitle: { fontSize: 14, fontWeight: "700", lineHeight: 18 },
+  infoAuthor: { fontSize: 12 },
   genreRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
-  infoGenre: { color: "#8b5cf6", fontSize: 11 },
+  infoGenre: { fontSize: 11 },
   cartBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#7c3aed",
     borderRadius: 10,
     paddingVertical: 8,
     marginTop: 8,
+    gap: 6,
   },
   cartText: { color: "white", fontSize: 13, fontWeight: "600" },
   row: { justifyContent: "space-between" },
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 8 },
-  loadingText: { color: "#555", marginTop: 12 },
+  loadingText: { marginTop: 12 },
   errorText: { color: "#f87171", fontSize: 14 },
-  errorHint: { color: "#555", fontSize: 12 },
-  emptyText: { color: "#555", fontSize: 16, marginTop: 8 },
+  errorHint: { fontSize: 12 },
+  emptyText: { fontSize: 16, marginTop: 8 },
 });

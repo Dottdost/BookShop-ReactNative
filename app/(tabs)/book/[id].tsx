@@ -1,6 +1,5 @@
 import API_URL from "@/.expo/config/api";
-import cartStorage from "../../hooks/cartStorage";
-
+import { useTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -14,8 +13,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import cartStorage from "../../hooks/cartStorage";
 
-// ✅ вишлист привязан к userId
 const wishlistStorage = {
   _key: (): string => {
     if (Platform.OS !== "web") return "wishlist_guest";
@@ -46,6 +45,7 @@ const wishlistStorage = {
 };
 
 function SkeletonLoader() {
+  const { theme } = useTheme();
   const shimmer = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -67,11 +67,11 @@ function SkeletonLoader() {
 
   const bg = shimmer.interpolate({
     inputRange: [0, 1],
-    outputRange: ["#1a1a25", "#2a2a3a"],
+    outputRange: [theme.bg2, theme.bg3],
   });
 
   return (
-    <View style={styles.skeletonContainer}>
+    <View style={[styles.skeletonContainer, { backgroundColor: theme.bg }]}>
       <Animated.View style={[styles.skeletonImage, { backgroundColor: bg }]} />
       <View style={styles.skeletonContent}>
         <Animated.View
@@ -92,6 +92,7 @@ function SkeletonLoader() {
 }
 
 export default function BookDetails() {
+  const { theme } = useTheme();
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [book, setBook] = useState<any>(null);
@@ -125,7 +126,6 @@ export default function BookDetails() {
       const data = await res.json();
       setBook(data);
       setLiked(wishlistStorage.isLiked(String(id)));
-
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -161,7 +161,6 @@ export default function BookDetails() {
         useNativeDriver: false,
       }),
     ]).start();
-
     if (book) {
       cartStorage.add({
         bookId: String(id),
@@ -174,6 +173,7 @@ export default function BookDetails() {
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
+
   const handleLike = () => {
     const newVal = wishlistStorage.toggle(String(id));
     setLiked(newVal);
@@ -214,13 +214,23 @@ export default function BookDetails() {
   if (!book) return <SkeletonLoader />;
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: theme.bg }]}>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* ОБЛОЖКА */}
         <Animated.View
           style={[styles.imageWrapper, { transform: [{ scale: scaleImg }] }]}
         >
           <Image source={{ uri: book.imageUrl }} style={styles.image} />
-          <View style={styles.imageOverlay} />
+          <View
+            style={[
+              styles.imageOverlay,
+              {
+                backgroundColor: theme.dark
+                  ? "rgba(11,11,16,0.65)"
+                  : "rgba(245,240,232,0.5)",
+              },
+            ]}
+          />
 
           <View style={styles.priceBadge}>
             <Text style={styles.priceBadgeText}>${book.price}</Text>
@@ -250,52 +260,186 @@ export default function BookDetails() {
           )}
         </Animated.View>
 
+        {/* КОНТЕНТ */}
         <Animated.View
           style={[
             styles.content,
             { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
           ]}
         >
+          {/* ТЕГИ */}
           <View style={styles.tagsRow}>
             {book.genreName && (
-              <View style={styles.tag}>
-                <Ionicons name="bookmark" size={11} color="#a78bfa" />
-                <Text style={styles.tagText}> {book.genreName}</Text>
+              <View
+                style={[
+                  styles.tag,
+                  {
+                    backgroundColor: theme.accentBg,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Ionicons name="bookmark" size={11} color={theme.accent} />
+                <Text style={[styles.tagText, { color: theme.accent }]}>
+                  {" "}
+                  {book.genreName}
+                </Text>
               </View>
             )}
-            <View style={styles.tag}>
-              <Ionicons name="layers-outline" size={11} color="#a78bfa" />
-              <Text style={styles.tagText}> {book.stock} in stock</Text>
+            <View
+              style={[
+                styles.tag,
+                { backgroundColor: theme.accentBg, borderColor: theme.border },
+              ]}
+            >
+              <Ionicons name="layers-outline" size={11} color={theme.accent} />
+              <Text style={[styles.tagText, { color: theme.accent }]}>
+                {" "}
+                {book.stock} in stock
+              </Text>
             </View>
             {book.publisherName && (
-              <View style={styles.tag}>
-                <Ionicons name="business-outline" size={11} color="#a78bfa" />
-                <Text style={styles.tagText}> {book.publisherName}</Text>
+              <View
+                style={[
+                  styles.tag,
+                  {
+                    backgroundColor: theme.accentBg,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="business-outline"
+                  size={11}
+                  color={theme.accent}
+                />
+                <Text style={[styles.tagText, { color: theme.accent }]}>
+                  {" "}
+                  {book.publisherName}
+                </Text>
               </View>
             )}
           </View>
 
-          <Text style={styles.title}>{book.title}</Text>
-          <Text style={styles.author}>by {book.author}</Text>
-          <View style={styles.divider} />
-          <Text style={styles.sectionLabel}>
-            <Ionicons name="reader-outline" size={14} color="#8b5cf6" />{" "}
-            Description
+          <Text style={[styles.title, { color: theme.text }]}>
+            {book.title}
           </Text>
-          <Text style={styles.description}>{book.description}</Text>
+          <Text style={[styles.author, { color: theme.text2 }]}>
+            by {book.author}
+          </Text>
+
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+          {/* ОПИСАНИЕ */}
+          <View
+            style={[
+              styles.descCard,
+              { backgroundColor: theme.bg2, borderColor: theme.border },
+            ]}
+          >
+            <View style={styles.descHeader}>
+              <Ionicons name="reader-outline" size={16} color={theme.accent} />
+              <Text style={[styles.sectionLabel, { color: theme.accent }]}>
+                Description
+              </Text>
+            </View>
+            <Text style={[styles.description, { color: theme.text2 }]}>
+              {book.description}
+            </Text>
+          </View>
+
+          {/* ДЕТАЛИ */}
+          <View
+            style={[
+              styles.detailsCard,
+              { backgroundColor: theme.bg2, borderColor: theme.border },
+            ]}
+          >
+            <View style={styles.detailRow}>
+              <Ionicons name="person-outline" size={16} color={theme.text3} />
+              <Text style={[styles.detailLabel, { color: theme.text3 }]}>
+                Author
+              </Text>
+              <Text style={[styles.detailValue, { color: theme.text }]}>
+                {book.author}
+              </Text>
+            </View>
+            <View
+              style={[styles.detailDivider, { backgroundColor: theme.border }]}
+            />
+            <View style={styles.detailRow}>
+              <Ionicons name="bookmark-outline" size={16} color={theme.text3} />
+              <Text style={[styles.detailLabel, { color: theme.text3 }]}>
+                Genre
+              </Text>
+              <Text style={[styles.detailValue, { color: theme.text }]}>
+                {book.genreName}
+              </Text>
+            </View>
+            {book.publisherName && (
+              <>
+                <View
+                  style={[
+                    styles.detailDivider,
+                    { backgroundColor: theme.border },
+                  ]}
+                />
+                <View style={styles.detailRow}>
+                  <Ionicons
+                    name="business-outline"
+                    size={16}
+                    color={theme.text3}
+                  />
+                  <Text style={[styles.detailLabel, { color: theme.text3 }]}>
+                    Publisher
+                  </Text>
+                  <Text style={[styles.detailValue, { color: theme.text }]}>
+                    {book.publisherName}
+                  </Text>
+                </View>
+              </>
+            )}
+            <View
+              style={[styles.detailDivider, { backgroundColor: theme.border }]}
+            />
+            <View style={styles.detailRow}>
+              <Ionicons name="cube-outline" size={16} color={theme.text3} />
+              <Text style={[styles.detailLabel, { color: theme.text3 }]}>
+                In stock
+              </Text>
+              <Text style={[styles.detailValue, { color: theme.text }]}>
+                {book.stock}
+              </Text>
+            </View>
+          </View>
+
           <View style={{ height: 120 }} />
         </Animated.View>
       </ScrollView>
 
+      {/* BOTTOM BAR */}
       <Animated.View
-        style={[styles.bottomBar, { transform: [{ scale: btnScale }] }]}
+        style={[
+          styles.bottomBar,
+          {
+            backgroundColor: theme.bg2,
+            borderTopColor: theme.border,
+            transform: [{ scale: btnScale }],
+          },
+        ]}
       >
         <View style={styles.priceRow}>
-          <Text style={styles.priceLabel}>Price</Text>
-          <Text style={styles.price}>${book.price}</Text>
+          <Text style={[styles.priceLabel, { color: theme.text3 }]}>Price</Text>
+          <Text style={[styles.price, { color: theme.accent }]}>
+            ${book.price}
+          </Text>
         </View>
+
         <TouchableOpacity
-          style={[styles.cartBtn, added && styles.cartBtnDone]}
+          style={[
+            styles.cartBtn,
+            { backgroundColor: added ? "#16a34a" : theme.accent },
+          ]}
           onPress={handleAddToCart}
           activeOpacity={0.85}
         >
@@ -314,9 +458,9 @@ export default function BookDetails() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0b0b10" },
+  root: { flex: 1 },
   scroll: { flex: 1 },
-  skeletonContainer: { flex: 1, backgroundColor: "#0b0b10" },
+  skeletonContainer: { flex: 1 },
   skeletonImage: { width: "100%", height: 300 },
   skeletonContent: { padding: 20, gap: 14 },
   skeletonLine: { height: 16, borderRadius: 8 },
@@ -328,8 +472,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 80,
-    backgroundColor: "rgba(11,11,16,0.6)",
+    height: 100,
   },
   priceBadge: {
     position: "absolute",
@@ -348,46 +491,67 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.15)",
   },
-  content: { padding: 20, marginTop: 0 },
+  content: { padding: 20 },
   tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
   tag: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(139,92,246,0.12)",
     borderWidth: 1,
-    borderColor: "rgba(139,92,246,0.25)",
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  tagText: { color: "#a78bfa", fontSize: 11 },
+  tagText: { fontSize: 11 },
   title: {
-    color: "white",
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "800",
     letterSpacing: 0.3,
-    lineHeight: 34,
+    lineHeight: 32,
     marginBottom: 6,
   },
-  author: { color: "#888", fontSize: 16, marginBottom: 24 },
-  divider: {
-    height: 1,
-    backgroundColor: "rgba(139,92,246,0.15)",
-    marginBottom: 20,
+  author: { fontSize: 15, marginBottom: 20 },
+  divider: { height: 1, marginBottom: 20 },
+
+  // DESCRIPTION CARD
+  descCard: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    marginBottom: 12,
   },
-  sectionLabel: {
-    color: "#8b5cf6",
-    fontSize: 14,
-    fontWeight: "600",
+  descHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     marginBottom: 10,
   },
-  description: { color: "#d1d5db", fontSize: 15, lineHeight: 26 },
+  sectionLabel: { fontSize: 14, fontWeight: "600" },
+  description: { fontSize: 14, lineHeight: 24 },
+
+  // DETAILS CARD
+  detailsCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    gap: 10,
+  },
+  detailLabel: { flex: 1, fontSize: 13 },
+  detailValue: { fontSize: 13, fontWeight: "600" },
+  detailDivider: { height: 1, marginHorizontal: 14 },
+
+  // BOTTOM BAR
   bottomBar: {
     position: "absolute",
     bottom: 0,
@@ -399,22 +563,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     paddingBottom: 28,
-    backgroundColor: "#13131f",
     borderTopWidth: 1,
-    borderTopColor: "rgba(139,92,246,0.2)",
   },
   priceRow: { gap: 2 },
-  priceLabel: { color: "#555", fontSize: 12 },
-  price: { color: "#c084fc", fontSize: 26, fontWeight: "800" },
+  priceLabel: { fontSize: 12 },
+  price: { fontSize: 26, fontWeight: "800" },
   cartBtn: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#7c3aed",
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 16,
     gap: 8,
   },
-  cartBtnDone: { backgroundColor: "#16a34a" },
   cartText: { color: "white", fontSize: 15, fontWeight: "700" },
 });

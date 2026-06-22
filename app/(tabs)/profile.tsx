@@ -1,3 +1,5 @@
+import { useAuth } from "@/app/hooks/useAuth";
+import { useTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
@@ -10,7 +12,6 @@ import {
   View,
 } from "react-native";
 
-//localStorage на вебе, SecureStore на мобилке
 const storage = {
   get: async (key: string) => {
     if (Platform.OS === "web") return localStorage.getItem(key);
@@ -28,9 +29,11 @@ const storage = {
 };
 
 export default function Profile() {
+  const { theme } = useTheme();
   const [loggedIn, setLoggedIn] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const { isAdmin } = useAuth();
 
   useFocusEffect(
     useCallback(() => {
@@ -39,6 +42,8 @@ export default function Profile() {
   );
 
   const animate = () => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(30);
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -71,34 +76,43 @@ export default function Profile() {
       <Animated.View
         style={[
           styles.container,
-          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+          {
+            backgroundColor: theme.bg,
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          },
         ]}
       >
-        <View style={styles.iconCircle}>
-          <Ionicons name="person-outline" size={48} color="#8b5cf6" />
+        <View
+          style={[
+            styles.iconCircle,
+            { backgroundColor: theme.accentBg, borderColor: theme.border },
+          ]}
+        >
+          <Ionicons name="person-outline" size={48} color={theme.accent} />
         </View>
-
-        <Text style={styles.title}> You are not logged in</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { color: theme.text }]}>
+          You're not logged in
+        </Text>
+        <Text style={[styles.subtitle, { color: theme.text3 }]}>
           Sign in to access your shelf, orders and wishlist
         </Text>
-
-        <View style={styles.divider} />
-
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <TouchableOpacity
-          style={styles.primaryBtn}
+          style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
           onPress={() => router.push("/sign-in")}
         >
           <Ionicons name="log-in-outline" size={20} color="white" />
           <Text style={styles.primaryBtnText}>Sign In</Text>
         </TouchableOpacity>
-
         <TouchableOpacity
-          style={styles.secondaryBtn}
+          style={[styles.secondaryBtn, { borderColor: theme.border }]}
           onPress={() => router.push("/sign-up")}
         >
-          <Ionicons name="person-add-outline" size={20} color="#8b5cf6" />
-          <Text style={styles.secondaryBtnText}>Create Account</Text>
+          <Ionicons name="person-add-outline" size={20} color={theme.accent} />
+          <Text style={[styles.secondaryBtnText, { color: theme.accent }]}>
+            Create Account
+          </Text>
         </TouchableOpacity>
       </Animated.View>
     );
@@ -108,48 +122,80 @@ export default function Profile() {
     <Animated.View
       style={[
         styles.container,
-        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+        {
+          backgroundColor: theme.bg,
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
       ]}
     >
       <View style={styles.avatarWrapper}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={48} color="#8b5cf6" />
+        <View
+          style={[
+            styles.avatar,
+            { backgroundColor: theme.accentBg, borderColor: theme.accent },
+          ]}
+        >
+          <Ionicons name="person" size={48} color={theme.accent} />
         </View>
-        <View style={styles.onlineDot} />
+        <View style={[styles.onlineDot, { borderColor: theme.bg }]} />
       </View>
 
-      <Text style={styles.title}>Welcome back ✨</Text>
-      <Text style={styles.subtitle}>You are signed in to Cheshire Shelf</Text>
+      <Text style={[styles.title, { color: theme.text }]}>Welcome back</Text>
+      <Text style={[styles.subtitle, { color: theme.text3 }]}>
+        You are signed in to Cheshire Shelf
+      </Text>
 
-      <View style={styles.divider} />
+      <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-      <View style={styles.menuCard}>
-        <TouchableOpacity
-          style={styles.menuItem}
-          // onPress={() => router.push("/orders")}
-        >
-          <Ionicons name="bag-outline" size={20} color="#8b5cf6" />
-          <Text style={styles.menuText}>My Orders</Text>
-          <Ionicons name="chevron-forward" size={16} color="#555" />
-        </TouchableOpacity>
-        <View style={styles.menuDivider} />
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push("/wishlist")}
-        >
-          <Ionicons name="heart-outline" size={20} color="#8b5cf6" />
-          <Text style={styles.menuText}>Wishlist</Text>
-          <Ionicons name="chevron-forward" size={16} color="#555" />
-        </TouchableOpacity>
-        <View style={styles.menuDivider} />
-        <TouchableOpacity
-          style={styles.menuItem}
-          // onPress={() => router.push("/settings")}
-        >
-          <Ionicons name="settings-outline" size={20} color="#8b5cf6" />
-          <Text style={styles.menuText}>Settings</Text>
-          <Ionicons name="chevron-forward" size={16} color="#555" />
-        </TouchableOpacity>
+      <View
+        style={[
+          styles.menuCard,
+          { backgroundColor: theme.bg2, borderColor: theme.border },
+        ]}
+      >
+        {[
+          { icon: "bag-outline", label: "My Orders", onPress: () => {} },
+          {
+            icon: "heart-outline",
+            label: "Wishlist",
+            onPress: () => router.push("/wishlist"),
+          },
+          {
+            icon: "cart-outline",
+            label: "Cart",
+            onPress: () => router.push("/cart"),
+          },
+          { icon: "settings-outline", label: "Settings", onPress: () => {} },
+          ...(isAdmin
+            ? [
+                {
+                  icon: "shield-outline",
+                  label: "Admin Panel",
+                  onPress: () => router.push("/admin"),
+                },
+              ]
+            : []),
+        ].map((item, i, arr) => (
+          <View key={item.label}>
+            <TouchableOpacity style={styles.menuItem} onPress={item.onPress}>
+              <Ionicons
+                name={item.icon as any}
+                size={20}
+                color={item.label === "Admin Panel" ? "#f59e0b" : theme.accent}
+              />
+              <Text style={[styles.menuText, { color: theme.text }]}>
+                {item.label}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.text3} />
+            </TouchableOpacity>
+            {i < arr.length - 1 && (
+              <View
+                style={[styles.menuDivider, { backgroundColor: theme.border }]}
+              />
+            )}
+          </View>
+        ))}
       </View>
 
       <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
@@ -161,35 +207,22 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0b0b10",
-    alignItems: "center",
-    padding: 24,
-    paddingTop: 60,
-  },
+  container: { flex: 1, alignItems: "center", padding: 24, paddingTop: 40 },
   iconCircle: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: "rgba(139,92,246,0.1)",
     borderWidth: 2,
-    borderColor: "rgba(139,92,246,0.3)",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 24,
   },
-  avatarWrapper: {
-    position: "relative",
-    marginBottom: 24,
-  },
+  avatarWrapper: { position: "relative", marginBottom: 24 },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: "rgba(139,92,246,0.1)",
     borderWidth: 2,
-    borderColor: "#7c3aed",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -202,66 +235,41 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#22c55e",
     borderWidth: 2,
-    borderColor: "#0b0b10",
   },
   title: {
-    color: "white",
     fontSize: 26,
     fontWeight: "800",
     marginBottom: 8,
     letterSpacing: 0.3,
   },
-  subtitle: {
-    color: "#555",
-    fontSize: 14,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  divider: {
-    width: "100%",
-    height: 1,
-    backgroundColor: "rgba(139,92,246,0.15)",
-    marginVertical: 28,
-  },
+  subtitle: { fontSize: 14, textAlign: "center", lineHeight: 20 },
+  divider: { width: "100%", height: 1, marginVertical: 28 },
   primaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     width: "100%",
-    backgroundColor: "#7c3aed",
     paddingVertical: 16,
     borderRadius: 16,
     gap: 10,
     marginBottom: 12,
   },
-  primaryBtnText: {
-    color: "white",
-    fontWeight: "700",
-    fontSize: 16,
-  },
+  primaryBtnText: { color: "white", fontWeight: "700", fontSize: 16 },
   secondaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     width: "100%",
-    backgroundColor: "transparent",
     paddingVertical: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(139,92,246,0.4)",
     gap: 10,
   },
-  secondaryBtnText: {
-    color: "#8b5cf6",
-    fontWeight: "700",
-    fontSize: 16,
-  },
+  secondaryBtnText: { fontWeight: "700", fontSize: 16 },
   menuCard: {
     width: "100%",
-    backgroundColor: "#13131f",
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(139,92,246,0.15)",
     overflow: "hidden",
     marginBottom: 24,
   },
@@ -271,17 +279,8 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 14,
   },
-  menuText: {
-    flex: 1,
-    color: "white",
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    marginHorizontal: 18,
-  },
+  menuText: { flex: 1, fontSize: 15, fontWeight: "500" },
+  menuDivider: { height: 1, marginHorizontal: 18 },
   logoutBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -293,9 +292,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(248,113,113,0.2)",
   },
-  logoutText: {
-    color: "#f87171",
-    fontWeight: "600",
-    fontSize: 15,
-  },
+  logoutText: { color: "#f87171", fontWeight: "600", fontSize: 15 },
 });

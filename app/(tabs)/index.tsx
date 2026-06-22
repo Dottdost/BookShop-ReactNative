@@ -1,3 +1,6 @@
+import API_URL from "@/.expo/config/api";
+import { useTheme } from "@/context/ThemeContext";
+import { Ionicons } from "@expo/vector-icons";
 import { Link } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -10,8 +13,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import API_URL from "../../.expo/config/api";
-
 interface Book {
   id: string;
   title: string;
@@ -20,45 +21,109 @@ interface Book {
 }
 
 function BookCard({ item, index }: { item: Book; index: number }) {
+  const { theme } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      delay: index * 200,
-      useNativeDriver: false,
-    }).start();
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        delay: index * 150,
+        useNativeDriver: false,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        delay: index * 150,
+        useNativeDriver: false,
+      }),
+    ]).start();
   }, []);
 
   return (
     <Link href={`/book/${item.id}` as any} asChild>
-      <Animated.View style={[styles.cardWrapper, { opacity: fadeAnim }]}>
-        <TouchableOpacity activeOpacity={0.75} style={styles.card}>
+      <Animated.View
+        style={[
+          styles.cardWrapper,
+          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+        ]}
+      >
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[
+            styles.card,
+            { backgroundColor: theme.bg2, borderColor: theme.border },
+          ]}
+        >
           <Image source={{ uri: item.imageUrl }} style={styles.image} />
-          <View style={styles.overlay}>
-            <Text style={styles.bookTitle} numberOfLines={2}>
+
+          <View style={styles.cardBadge}>
+            <Ionicons name="star" size={10} color="#f59e0b" />
+            <Text style={styles.cardBadgeText}>New</Text>
+          </View>
+
+          <View
+            style={[
+              styles.overlay,
+              {
+                backgroundColor: theme.dark
+                  ? "rgba(0,0,0,0.75)"
+                  : "rgba(255,253,247,0.92)",
+              },
+            ]}
+          >
+            <Text
+              style={[styles.bookTitle, { color: theme.text }]}
+              numberOfLines={2}
+            >
               {item.title}
             </Text>
-            <Text style={styles.author}>{item.author}</Text>
+
+            <Text style={[styles.cardAuthor, { color: theme.text2 }]}>
+              {item.author}
+            </Text>
+
+            <View style={styles.readBtn}>
+              <Ionicons name="book-outline" size={11} color={theme.accent} />
+              <Text style={[styles.readBtnText, { color: theme.accent }]}>
+                View
+              </Text>
+            </View>
           </View>
-          <View style={styles.glow} />
         </TouchableOpacity>
       </Animated.View>
     </Link>
   );
 }
 
+const GENRES = [
+  { label: "Romance", icon: "heart-outline" },
+  { label: "Mystery", icon: "search-outline" },
+  { label: "Dark Fiction", icon: "moon-outline" },
+  { label: "Fantasy", icon: "sparkles-outline" },
+];
+
 export default function HomeScreen() {
+  const { theme } = useTheme();
   const [text, setText] = useState("");
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeGenre, setActiveGenre] = useState("Romance");
+  const headerAnim = useRef(new Animated.Value(0)).current;
 
-  const fullText =
-    "Welcome to Cheshire Shelf ✨ Step into a world where stories come to life";
+  const fullText = "Hello, Reader!";
 
   useEffect(() => {
+    Animated.timing(headerAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: false,
+    }).start();
+
     let index = 0;
+
     const interval = setInterval(() => {
       if (index < fullText.length) {
         setText(fullText.slice(0, index + 1));
@@ -66,7 +131,8 @@ export default function HomeScreen() {
       } else {
         clearInterval(interval);
       }
-    }, 20);
+    }, 60);
+
     return () => clearInterval(interval);
   }, []);
 
@@ -88,9 +154,7 @@ export default function HomeScreen() {
         const responses = await Promise.all(
           bookIds.map(async (id) => {
             const res = await fetch(`${API_URL}/api/books/${id}`);
-
             if (!res.ok) throw new Error("API error");
-
             return res.json();
           }),
         );
@@ -107,79 +171,293 @@ export default function HomeScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.hero}>
-        <Text style={styles.heroEmoji}>🐱📚</Text>
-        <Text style={styles.heroTitle}>Cheshire Shelf</Text>
-        <Text style={styles.heroSub}>{text}</Text>
+    <View style={[styles.container, { backgroundColor: theme.bg }]}>
+      <FlatList
+        data={[]}
+        keyExtractor={() => ""}
+        renderItem={null}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <>
+            <Animated.View style={[styles.hero, { opacity: headerAnim }]}>
+              <View style={styles.heroTop}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.greeting, { color: theme.accent }]}>
+                    {text}
+                  </Text>
 
-        <View style={styles.tagsRow}>
-          {["✦ Romance", "✦ Dark Fiction", "✦ Mystery"].map((tag) => (
-            <View key={tag} style={styles.tag}>
-              <Text style={styles.tagText}>{tag}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
+                  <Text style={[styles.heroTitle, { color: theme.text }]}>
+                    Your next favourite{"\n"}book awaits
+                  </Text>
+                </View>
 
-      <View style={styles.divider} />
+                <View
+                  style={[
+                    styles.catIcon,
+                    {
+                      backgroundColor: theme.accentBg,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <Ionicons name="paw-outline" size={26} color={theme.accent} />
+                </View>
+              </View>
 
-      {/* 📚 Recommendations */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>✨ Recommendations</Text>
-        <TouchableOpacity>
-          <Text style={styles.seeAll}>See all →</Text>
-        </TouchableOpacity>
-      </View>
-
-      {loading ? (
-        <ActivityIndicator
-          size="large"
-          color="#8b5cf6"
-          style={{ marginTop: 40 }}
-        />
-      ) : (
-        <FlatList
-          data={books}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item, index }) => (
-            <BookCard item={item} index={index} />
-          )}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={196}
-          decelerationRate="fast"
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
-        />
-      )}
-
-      {/* 🔥 Trending */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>🔥 Trending Now</Text>
-      </View>
-
-      <View style={styles.trendingRow}>
-        {["Dark Romance", "Enemies to Lovers", "Gothic Mystery"].map(
-          (genre, i) => (
-            <TouchableOpacity
-              key={genre}
-              style={[
-                styles.trendingChip,
-                i === 0 && styles.trendingChipActive,
-              ]}
-            >
-              <Text
+              <View
                 style={[
-                  styles.trendingChipText,
-                  i === 0 && styles.trendingChipTextActive,
+                  styles.statsRow,
+                  { backgroundColor: theme.bg2, borderColor: theme.border },
                 ]}
               >
-                {genre}
+                {[
+                  { icon: "library-outline", num: "2.4k", label: "Books" },
+                  { icon: "people-outline", num: "18k", label: "Readers" },
+                  { icon: "star-outline", num: "4.9", label: "Rating" },
+                ].map((s, i) => (
+                  <View key={s.label} style={{ flexDirection: "row", flex: 1 }}>
+                    {i > 0 && (
+                      <View
+                        style={[
+                          styles.statDivider,
+                          { backgroundColor: theme.border },
+                        ]}
+                      />
+                    )}
+
+                    <View style={styles.statCard}>
+                      <Ionicons
+                        name={s.icon as any}
+                        size={20}
+                        color={theme.accent}
+                      />
+                      <Text style={[styles.statNum, { color: theme.text }]}>
+                        {s.num}
+                      </Text>
+                      <Text style={[styles.statLabel, { color: theme.text3 }]}>
+                        {s.label}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </Animated.View>
+
+            <TouchableOpacity
+              style={[
+                styles.searchBar,
+                { backgroundColor: theme.bg2, borderColor: theme.border },
+              ]}
+            >
+              <Ionicons name="search-outline" size={18} color={theme.text3} />
+              <Text style={[styles.searchPlaceholder, { color: theme.text3 }]}>
+                Search books, authors...
               </Text>
+
+              <View
+                style={[
+                  styles.searchFilter,
+                  { backgroundColor: theme.accentBg },
+                ]}
+              >
+                <Ionicons
+                  name="options-outline"
+                  size={16}
+                  color={theme.accent}
+                />
+              </View>
             </TouchableOpacity>
-          ),
-        )}
-      </View>
+
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Genres
+              </Text>
+
+              <TouchableOpacity style={styles.seeAllBtn}>
+                <Text style={[styles.seeAll, { color: theme.accent }]}>
+                  See all
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={14}
+                  color={theme.accent}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={GENRES}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(g) => g.label}
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}
+              style={{ marginBottom: 24 }}
+              renderItem={({ item: g }) => {
+                const active = activeGenre === g.label;
+
+                return (
+                  <TouchableOpacity
+                    onPress={() => setActiveGenre(g.label)}
+                    style={[
+                      styles.genreChip,
+                      {
+                        backgroundColor: active ? theme.accent : theme.bg2,
+                        borderColor: active ? theme.accent : theme.border,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={g.icon as any}
+                      size={14}
+                      color={active ? "white" : theme.text2}
+                    />
+
+                    <Text
+                      style={[
+                        styles.genreText,
+                        {
+                          color: active ? "white" : theme.text2,
+                          fontWeight: active ? "600" : "400",
+                        },
+                      ]}
+                    >
+                      {g.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Picks for You
+              </Text>
+
+              <Link href="/books" asChild>
+                <TouchableOpacity style={styles.seeAllBtn}>
+                  <Text style={[styles.seeAll, { color: theme.accent }]}>
+                    See all
+                  </Text>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={14}
+                    color={theme.accent}
+                  />
+                </TouchableOpacity>
+              </Link>
+            </View>
+
+            {loading ? (
+              <ActivityIndicator
+                size="large"
+                color={theme.accent}
+                style={{ marginVertical: 24 }}
+              />
+            ) : (
+              <FlatList
+                data={books}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item, index }) => (
+                  <BookCard item={item} index={index} />
+                )}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={164}
+                decelerationRate="fast"
+                contentContainerStyle={{
+                  paddingHorizontal: 20,
+                  paddingBottom: 8,
+                }}
+              />
+            )}
+
+            {books[0] && (
+              <>
+                <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+                  <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                    Book of the Week
+                  </Text>
+                </View>
+
+                <Link href={`/book/${books[0].id}` as any} asChild>
+                  <TouchableOpacity
+                    style={[
+                      styles.featuredCard,
+                      { backgroundColor: theme.bg2, borderColor: theme.border },
+                    ]}
+                    activeOpacity={0.85}
+                  >
+                    <Image
+                      source={{ uri: books[0].imageUrl }}
+                      style={styles.featuredImage}
+                    />
+
+                    <View style={styles.featuredInfo}>
+                      <View
+                        style={[
+                          styles.featuredBadge,
+                          { backgroundColor: "rgba(245,158,11,0.1)" },
+                        ]}
+                      >
+                        <Ionicons
+                          name="trophy-outline"
+                          size={11}
+                          color="#f59e0b"
+                        />
+                        <Text style={styles.featuredBadgeText}>
+                          Editor's Pick
+                        </Text>
+                      </View>
+
+                      <Text
+                        style={[styles.featuredTitle, { color: theme.text }]}
+                        numberOfLines={2}
+                      >
+                        {books[0].title}
+                      </Text>
+
+                      <Text
+                        style={[styles.featuredAuthor, { color: theme.text2 }]}
+                      >
+                        {books[0].author}
+                      </Text>
+
+                      <View style={styles.featuredFooter}>
+                        <View style={styles.starsRow}>
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Ionicons
+                              key={s}
+                              name="star"
+                              size={12}
+                              color="#f59e0b"
+                            />
+                          ))}
+                        </View>
+
+                        <View
+                          style={[
+                            styles.featuredReadBtn,
+                            { backgroundColor: theme.accent },
+                          ]}
+                        >
+                          <Text style={styles.featuredReadText}>Read more</Text>
+                          <Ionicons
+                            name="arrow-forward"
+                            size={12}
+                            color="white"
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                </Link>
+              </>
+            )}
+
+            <View style={{ height: 40 }} />
+          </>
+        }
+      />
     </View>
   );
 }
@@ -187,55 +465,96 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0b0b10",
-    paddingTop: 110,
+    paddingTop: 26,
   },
 
   hero: {
     paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  heroEmoji: {
-    fontSize: 36,
-    marginBottom: 8,
-  },
-  heroTitle: {
-    fontSize: 36,
-    fontWeight: "800",
-    color: "white",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  heroSub: {
-    fontSize: 13,
-    color: "#c4b5fd",
-    lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: 18,
   },
 
-  tagsRow: {
+  heroTop: {
     flexDirection: "row",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  tag: {
-    borderWidth: 1,
-    borderColor: "#7c3aed",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    backgroundColor: "rgba(124,58,237,0.1)",
-  },
-  tagText: {
-    color: "#a78bfa",
-    fontSize: 12,
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 20,
+    gap: 12,
   },
 
-  divider: {
-    height: 1,
-    backgroundColor: "rgba(139,92,246,0.2)",
+  greeting: {
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    lineHeight: 34,
+    letterSpacing: 0.3,
+  },
+
+  catIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  statsRow: {
+    flexDirection: "row",
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+
+  statCard: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+  },
+
+  statNum: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+
+  statLabel: {
+    fontSize: 11,
+  },
+
+  statDivider: {
+    width: 1,
+    height: 40,
+  },
+
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 16,
     marginHorizontal: 20,
     marginBottom: 24,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    gap: 10,
+  },
+
+  searchPlaceholder: {
+    flex: 1,
+    fontSize: 14,
+  },
+
+  searchFilter: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   sectionHeader: {
@@ -243,87 +562,173 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 14,
   },
+
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
-    color: "white",
   },
+
+  seeAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+
   seeAll: {
-    color: "#8b5cf6",
+    fontSize: 13,
+  },
+
+  genreChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+
+  genreText: {
     fontSize: 13,
   },
 
   cardWrapper: {
-    marginRight: 16,
+    marginRight: 14,
   },
+
   card: {
-    width: 180,
-    height: 270,
+    width: 148,
+    height: 220,
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#111",
-    shadowColor: "#8b5cf6",
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
+    borderWidth: 1,
   },
+
   image: {
     width: "100%",
     height: "100%",
   },
+
+  cardBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+
+  cardBadgeText: {
+    color: "#f59e0b",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
   overlay: {
     position: "absolute",
     bottom: 0,
     width: "100%",
-    padding: 12,
-    backgroundColor: "rgba(0,0,0,0.7)",
-  },
-  bookTitle: {
-    color: "white",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  author: {
-    color: "#d4d4d8",
-    fontSize: 11,
-    marginTop: 2,
-  },
-  glow: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-    backgroundColor: "rgba(139, 92, 246, 0.12)",
+    padding: 10,
+    gap: 2,
   },
 
-  trendingRow: {
+  bookTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 16,
+  },
+
+  cardAuthor: {
+    fontSize: 10,
+  },
+
+  readBtn: {
     flexDirection: "row",
-    paddingHorizontal: 20,
-    gap: 10,
-    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
   },
-  trendingChip: {
+
+  readBtnText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  featuredCard: {
+    marginHorizontal: 20,
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    flexDirection: "row",
+    overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    height: 140,
   },
-  trendingChipActive: {
-    backgroundColor: "#7c3aed",
-    borderColor: "#7c3aed",
+
+  featuredImage: {
+    width: 100,
+    height: "100%",
   },
-  trendingChipText: {
-    color: "#9ca3af",
-    fontSize: 13,
+
+  featuredInfo: {
+    flex: 1,
+    padding: 14,
+    justifyContent: "space-between",
   },
-  trendingChipTextActive: {
+
+  featuredBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: "flex-start",
+  },
+
+  featuredBadgeText: {
+    color: "#f59e0b",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  featuredTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+
+  featuredAuthor: {
+    fontSize: 12,
+  },
+
+  featuredFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  starsRow: {
+    flexDirection: "row",
+    gap: 2,
+  },
+
+  featuredReadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+
+  featuredReadText: {
     color: "white",
+    fontSize: 11,
     fontWeight: "600",
   },
 });

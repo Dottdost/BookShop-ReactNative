@@ -1,4 +1,5 @@
 import API_URL from "@/.expo/config/api";
+import { useTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { Link, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -14,7 +15,6 @@ import {
   View,
 } from "react-native";
 
-// ✅ тот же объект что в book/[id].tsx и books.tsx
 const wishlistStorage = {
   _key: (): string => {
     if (Platform.OS !== "web") return "wishlist_guest";
@@ -59,6 +59,7 @@ function WishlistCard({
   item: Book;
   onRemove: (id: string) => void;
 }) {
+  const { theme } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
@@ -97,26 +98,47 @@ function WishlistCard({
     <Animated.View
       style={[
         styles.card,
-        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+        {
+          backgroundColor: theme.bg2,
+          borderColor: theme.border,
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
       ]}
     >
-      <Link href={`/book/${item.id}` as any} asChild>
+      <Link href={`/book/${item.id}` as any} >
         <TouchableOpacity style={styles.cardInner} activeOpacity={0.85}>
-          <Image source={{ uri: item.imageUrl }} style={styles.image} />
+          <Image
+            source={{ uri: item.imageUrl }}
+            style={[styles.image, { backgroundColor: theme.bg3 }]}
+          />
           <View style={styles.info}>
-            <Text style={styles.title} numberOfLines={2}>
+            <Text
+              style={[styles.title, { color: theme.text }]}
+              numberOfLines={2}
+            >
               {item.title}
             </Text>
-            <Text style={styles.author}>{item.author}</Text>
+            <Text style={[styles.author, { color: theme.text2 }]}>
+              {item.author}
+            </Text>
             <View style={styles.genreRow}>
-              <Ionicons name="bookmark-outline" size={11} color="#8b5cf6" />
-              <Text style={styles.genre}> {item.genreName}</Text>
+              <Ionicons
+                name="bookmark-outline"
+                size={11}
+                color={theme.accent}
+              />
+              <Text style={[styles.genre, { color: theme.accent }]}>
+                {" "}
+                {item.genreName}
+              </Text>
             </View>
-            <Text style={styles.price}>${item.price}</Text>
+            <Text style={[styles.price, { color: theme.accent }]}>
+              ${item.price}
+            </Text>
           </View>
         </TouchableOpacity>
       </Link>
-
       <TouchableOpacity style={styles.removeBtn} onPress={handleRemove}>
         <Animated.View style={{ transform: [{ scale: heartScale }] }}>
           <Ionicons name="heart" size={22} color="#f43f5e" />
@@ -127,6 +149,7 @@ function WishlistCard({
 }
 
 export default function Wishlist() {
+  const { theme } = useTheme();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -139,7 +162,6 @@ export default function Wishlist() {
       setIsLoggedIn(loggedIn);
       if (loggedIn) loadWishlist();
       else setLoading(false);
-
       Animated.timing(headerAnim, {
         toValue: 1,
         duration: 500,
@@ -178,17 +200,25 @@ export default function Wishlist() {
 
   if (!isLoggedIn) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.bg }]}>
         <View style={styles.emptyCenter}>
-          <Ionicons name="heart-dislike-outline" size={64} color="#333" />
-          <Text style={styles.emptyTitle}>Sign in to use Wishlist</Text>
-          <Text style={styles.emptySubtitle}>
+          <Ionicons
+            name="heart-dislike-outline"
+            size={64}
+            color={theme.text3}
+          />
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
+            Sign in to use Wishlist
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
             Save books you love and come back to them anytime
           </Text>
-          <Link href="/sign-in" asChild>
-            <TouchableOpacity style={styles.signInBtn}>
+          <Link href="/sign-in" >
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: theme.accent }]}
+            >
               <Ionicons name="log-in-outline" size={18} color="white" />
-              <Text style={styles.signInBtnText}>Sign In</Text>
+              <Text style={styles.actionBtnText}>Sign In</Text>
             </TouchableOpacity>
           </Link>
         </View>
@@ -197,23 +227,27 @@ export default function Wishlist() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <Animated.View style={[styles.header, { opacity: headerAnim }]}>
-        <Text style={styles.headerTitle}>My Wishlist</Text>
-        <Text style={styles.headerCount}>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          My Wishlist
+        </Text>
+        <Text style={[styles.headerCount, { color: theme.accent }]}>
           {books.length} book{books.length !== 1 ? "s" : ""}
         </Text>
       </Animated.View>
 
       {loading ? (
         <View style={styles.emptyCenter}>
-          <ActivityIndicator size="large" color="#8b5cf6" />
+          <ActivityIndicator size="large" color={theme.accent} />
         </View>
       ) : books.length === 0 ? (
         <View style={styles.emptyCenter}>
-          <Ionicons name="heart-outline" size={64} color="#333" />
-          <Text style={styles.emptyTitle}>Your wishlist is empty</Text>
-          <Text style={styles.emptySubtitle}>
+          <Ionicons name="heart-outline" size={64} color={theme.text3} />
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
+            Your wishlist is empty
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
             Tap the heart on any book to save it here
           </Text>
         </View>
@@ -233,7 +267,7 @@ export default function Wishlist() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0b0b10" },
+  container: { flex: 1 },
   header: {
     paddingHorizontal: 20,
     paddingTop: 20,
@@ -242,31 +276,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  headerTitle: { color: "white", fontSize: 24, fontWeight: "800" },
-  headerCount: { color: "#8b5cf6", fontSize: 14, fontWeight: "600" },
+  headerTitle: { fontSize: 24, fontWeight: "800" },
+  headerCount: { fontSize: 14, fontWeight: "600" },
   card: {
-    backgroundColor: "#13131f",
     borderRadius: 18,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "rgba(139,92,246,0.15)",
     overflow: "hidden",
     flexDirection: "row",
     alignItems: "center",
   },
   cardInner: { flex: 1, flexDirection: "row", padding: 12, gap: 14 },
-  image: {
-    width: 80,
-    height: 110,
-    borderRadius: 12,
-    backgroundColor: "#1a1a25",
-  },
+  image: { width: 80, height: 110, borderRadius: 12 },
   info: { flex: 1, justifyContent: "center", gap: 4 },
-  title: { color: "white", fontSize: 15, fontWeight: "700", lineHeight: 20 },
-  author: { color: "#888", fontSize: 13 },
+  title: { fontSize: 15, fontWeight: "700", lineHeight: 20 },
+  author: { fontSize: 13 },
   genreRow: { flexDirection: "row", alignItems: "center" },
-  genre: { color: "#8b5cf6", fontSize: 11 },
-  price: { color: "#c084fc", fontSize: 18, fontWeight: "800", marginTop: 4 },
+  genre: { fontSize: 11 },
+  price: { fontSize: 18, fontWeight: "800", marginTop: 4 },
   removeBtn: { padding: 16, justifyContent: "center", alignItems: "center" },
   emptyCenter: {
     flex: 1,
@@ -275,27 +302,16 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 40,
   },
-  emptyTitle: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  emptySubtitle: {
-    color: "#555",
-    fontSize: 14,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  signInBtn: {
+  emptyTitle: { fontSize: 20, fontWeight: "700", textAlign: "center" },
+  emptySubtitle: { fontSize: 14, textAlign: "center", lineHeight: 20 },
+  actionBtn: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#7c3aed",
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 14,
     gap: 8,
     marginTop: 8,
   },
-  signInBtnText: { color: "white", fontWeight: "700", fontSize: 15 },
+  actionBtnText: { color: "white", fontWeight: "700", fontSize: 15 },
 });
