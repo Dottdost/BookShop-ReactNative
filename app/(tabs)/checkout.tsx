@@ -16,6 +16,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 import cartStorage from "../hooks/cartStorage";
 
 function CardModal({
@@ -35,6 +36,7 @@ function CardModal({
   loading: boolean;
 }) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [cardNumber, setCardNumber] = useState("");
   const [cardHolderName, setCardHolderName] = useState("");
   const [expDate, setExpDate] = useState("");
@@ -85,7 +87,7 @@ function CardModal({
 
   const handleConfirm = () => {
     if (!cardNumber || !cardHolderName || !expDate || !cvv) {
-      Alert.alert("Error", "Please fill in all card fields");
+      Alert.alert(t("common.error"), t("checkoutScreen.fillCard"));
       return;
     }
     const [month, year] = expDate.split("/");
@@ -98,6 +100,25 @@ function CardModal({
       cvv: cvv.slice(0, 4),
     });
   };
+
+  const cardFields = [
+    {
+      icon: "card-outline",
+      placeholder: t("checkoutScreen.cardNumber"),
+      value: cardNumber,
+      set: (v: string) => setCardNumber(formatCardNumber(v)),
+      keyboard: "numeric",
+      maxLen: 19,
+    },
+    {
+      icon: "person-outline",
+      placeholder: t("checkoutScreen.cardHolderName"),
+      value: cardHolderName,
+      set: (v: string) => setCardHolderName(v.toUpperCase()),
+      keyboard: "default",
+      maxLen: 50,
+    },
+  ];
 
   return (
     <Modal visible={visible} transparent animationType="none">
@@ -116,14 +137,13 @@ function CardModal({
         ]}
       >
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
-        <Text style={[styles.sheetTitle, { color: theme.text }]}>
-          Payment Details
+        <Text style={[styles.sheetTitle, { color: theme.text }]}> 
+          {t("checkoutScreen.paymentDetails")}
         </Text>
-        <Text style={[styles.sheetSubtitle, { color: theme.text3 }]}>
-          Your card info is used only for this order
+        <Text style={[styles.sheetSubtitle, { color: theme.text3 }]}> 
+          {t("checkoutScreen.paymentSubtitle")}
         </Text>
 
-        {/* карта-превью */}
         <View style={styles.cardPreview}>
           <View style={styles.cardPreviewTop}>
             <Ionicons
@@ -138,36 +158,19 @@ function CardModal({
           </Text>
           <View style={styles.cardPreviewBottom}>
             <View>
-              <Text style={styles.cardLabel}>CARD HOLDER</Text>
+              <Text style={styles.cardLabel}>{t("checkoutScreen.cardHolder")}</Text>
               <Text style={styles.cardValue}>
-                {cardHolderName || "YOUR NAME"}
+                {cardHolderName || t("checkoutScreen.yourName")}
               </Text>
             </View>
             <View>
-              <Text style={styles.cardLabel}>EXPIRES</Text>
+              <Text style={styles.cardLabel}>{t("checkoutScreen.expires")}</Text>
               <Text style={styles.cardValue}>{expDate || "MM/YY"}</Text>
             </View>
           </View>
         </View>
 
-        {[
-          {
-            icon: "card-outline",
-            placeholder: "Card Number",
-            value: cardNumber,
-            set: (v: string) => setCardNumber(formatCardNumber(v)),
-            keyboard: "numeric",
-            maxLen: 19,
-          },
-          {
-            icon: "person-outline",
-            placeholder: "Card Holder Name",
-            value: cardHolderName,
-            set: (v: string) => setCardHolderName(v.toUpperCase()),
-            keyboard: "default",
-            maxLen: 50,
-          },
-        ].map(({ icon, placeholder, value, set, keyboard, maxLen }) => (
+        {cardFields.map(({ icon, placeholder, value, set, keyboard, maxLen }) => (
           <View
             key={placeholder}
             style={[
@@ -256,8 +259,8 @@ function CardModal({
             size={20}
             color="white"
           />
-          <Text style={styles.confirmBtnText}>
-            {loading ? "Processing..." : "Confirm & Pay"}
+          <Text style={styles.confirmBtnText}> 
+            {loading ? t("checkoutScreen.processing") : t("checkoutScreen.confirmAndPay")}
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -267,6 +270,7 @@ function CardModal({
 
 export default function Checkout() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [street, setStreet] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
@@ -294,7 +298,7 @@ export default function Checkout() {
 
   const handlePlaceOrder = () => {
     if (!street || !city || !country || !postalCode) {
-      Alert.alert("Error", "Please fill in all address fields");
+      Alert.alert(t("common.error"), t("checkoutScreen.fillAddress"));
       return;
     }
     pressAnim();
@@ -314,7 +318,7 @@ export default function Checkout() {
       const token =
         Platform.OS === "web" ? localStorage.getItem("token") : null;
       if (!userId || !token) {
-        Alert.alert("Error", "Not logged in");
+        Alert.alert(t("common.error"), t("checkoutScreen.notLoggedIn"));
         return;
       }
 
@@ -364,14 +368,14 @@ export default function Checkout() {
         }),
       });
 
-      if (!orderRes.ok) throw new Error("Order failed");
+      if (!orderRes.ok) throw new Error(t("checkoutScreen.orderFailed"));
       cartStorage.clear();
       setShowCardModal(false);
-      Alert.alert("Order placed!", "Your books are on their way!", [
-        { text: "OK", onPress: () => router.replace("/cart") },
+      Alert.alert(t("checkoutScreen.orderPlaced"), t("checkoutScreen.orderSuccess"), [
+        { text: t("checkoutScreen.ok"), onPress: () => router.replace("/cart") },
       ]);
     } catch (e: any) {
-      Alert.alert("Error", e.message || "Something went wrong");
+      Alert.alert(t("common.error"), e.message || t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -381,22 +385,22 @@ export default function Checkout() {
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
   const addressFields = [
-    { label: "Street", value: street, set: setStreet, icon: "home-outline" },
-    { label: "City", value: city, set: setCity, icon: "business-outline" },
+    { label: t("checkoutScreen.street"), value: street, set: setStreet, icon: "home-outline" },
+    { label: t("checkoutScreen.city"), value: city, set: setCity, icon: "business-outline" },
     {
-      label: "State / Region",
+      label: t("checkoutScreen.state"),
       value: state,
       set: setState,
       icon: "map-outline",
     },
     {
-      label: "Postal Code",
+      label: t("checkoutScreen.postalCode"),
       value: postalCode,
       set: setPostalCode,
       icon: "mail-outline",
     },
     {
-      label: "Country",
+      label: t("checkoutScreen.country"),
       value: country,
       set: setCountry,
       icon: "globe-outline",
@@ -409,7 +413,9 @@ export default function Checkout() {
         style={[styles.container, { backgroundColor: theme.bg }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.pageTitle, { color: theme.text }]}>Checkout</Text>
+        <Text style={[styles.pageTitle, { color: theme.text }]}> 
+          {t("checkoutScreen.title")}
+        </Text>
 
         <View
           style={[
@@ -419,8 +425,8 @@ export default function Checkout() {
         >
           <View style={styles.sectionHeader}>
             <Ionicons name="receipt-outline" size={14} color={theme.accent} />
-            <Text style={[styles.sectionTitle, { color: theme.accent }]}>
-              Order Summary
+            <Text style={[styles.sectionTitle, { color: theme.accent }]}> 
+              {t("checkoutScreen.orderSummary")}
             </Text>
           </View>
           {items.map((item) => (
@@ -431,19 +437,19 @@ export default function Checkout() {
               >
                 {item.title}
               </Text>
-              <Text style={[styles.summaryQty, { color: theme.text2 }]}>
+              <Text style={[styles.summaryQty, { color: theme.text2 }]}> 
                 ×{item.quantity}
               </Text>
-              <Text style={[styles.summaryPrice, { color: theme.accent }]}>
+              <Text style={[styles.summaryPrice, { color: theme.accent }]}> 
                 ${(item.price * item.quantity).toFixed(2)}
               </Text>
             </View>
           ))}
-          <View style={[styles.totalRow, { borderTopColor: theme.border }]}>
-            <Text style={[styles.totalLabel, { color: theme.text2 }]}>
-              Total
+          <View style={[styles.totalRow, { borderTopColor: theme.border }]}> 
+            <Text style={[styles.totalLabel, { color: theme.text2 }]}> 
+              {t("common.total")}
             </Text>
-            <Text style={[styles.totalPrice, { color: theme.text }]}>
+            <Text style={[styles.totalPrice, { color: theme.text }]}> 
               ${total.toFixed(2)}
             </Text>
           </View>
@@ -457,8 +463,8 @@ export default function Checkout() {
         >
           <View style={styles.sectionHeader}>
             <Ionicons name="location-outline" size={14} color={theme.accent} />
-            <Text style={[styles.sectionTitle, { color: theme.accent }]}>
-              Delivery Address
+            <Text style={[styles.sectionTitle, { color: theme.accent }]}> 
+              {t("checkoutScreen.deliveryAddress")}
             </Text>
           </View>
           {addressFields.map(({ label, value, set, icon }) => (
@@ -494,8 +500,8 @@ export default function Checkout() {
         >
           <View style={styles.sectionHeader}>
             <Ionicons name="pricetag-outline" size={14} color={theme.accent} />
-            <Text style={[styles.sectionTitle, { color: theme.accent }]}>
-              Promo Code
+            <Text style={[styles.sectionTitle, { color: theme.accent }]}> 
+              {t("checkoutScreen.promoCode")}
             </Text>
           </View>
           <View
@@ -511,7 +517,7 @@ export default function Checkout() {
               style={styles.inputIcon}
             />
             <TextInput
-              placeholder="Enter promo code (optional)"
+              placeholder={t("checkoutScreen.enterPromoCode")}
               placeholderTextColor={theme.text3}
               value={promoCode}
               onChangeText={setPromoCode}
@@ -533,7 +539,7 @@ export default function Checkout() {
             onPress={handlePlaceOrder}
           >
             <Ionicons name="card-outline" size={22} color="white" />
-            <Text style={styles.orderBtnText}>Place Order</Text>
+            <Text style={styles.orderBtnText}>{t("checkoutScreen.placeOrder")}</Text>
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>
