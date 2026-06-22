@@ -15,6 +15,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
+
 interface Book {
   id: string;
   title: string;
@@ -60,6 +62,7 @@ const wishlistStorage = {
 
 function BookCard({ item, isLoggedIn }: { item: Book; isLoggedIn: boolean }) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [flipped, setFlipped] = useState(false);
   const [liked, setLiked] = useState(() => wishlistStorage.isLiked(item.id));
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -156,8 +159,6 @@ function BookCard({ item, isLoggedIn }: { item: Book; isLoggedIn: boolean }) {
           ]}
         >
           <Image source={{ uri: item.imageUrl }} style={styles.image} />
-
-          {/* затемнение снизу */}
           <View style={styles.imageGradient} />
 
           <View style={styles.priceTag}>
@@ -191,7 +192,6 @@ function BookCard({ item, isLoggedIn }: { item: Book; isLoggedIn: boolean }) {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* flip panel */}
         <Animated.View
           style={[
             styles.infoPanel,
@@ -207,15 +207,12 @@ function BookCard({ item, isLoggedIn }: { item: Book; isLoggedIn: boolean }) {
           >
             {item.title}
           </Text>
-          <Text style={[styles.infoAuthor, { color: theme.text2 }]}>
+          <Text style={[styles.infoAuthor, { color: theme.text2 }]}> 
             {item.author}
           </Text>
           <View style={styles.genreRow}>
             <Ionicons name="bookmark-outline" size={11} color={theme.accent} />
-            <Text style={[styles.infoGenre, { color: theme.accent }]}>
-              {" "}
-              {item.genreName}
-            </Text>
+            <Text style={[styles.infoGenre, { color: theme.accent }]}> {item.genreName}</Text>
           </View>
           <TouchableOpacity
             style={[styles.cartBtn, { backgroundColor: theme.accent }]}
@@ -225,13 +222,12 @@ function BookCard({ item, isLoggedIn }: { item: Book; isLoggedIn: boolean }) {
             }}
           >
             <Ionicons name="arrow-forward-outline" size={14} color="white" />
-            <Text style={styles.cartText}>View book</Text>
+            <Text style={styles.cartText}>{t("booksScreen.viewBook")}</Text>
           </TouchableOpacity>
         </Animated.View>
 
-        {/* static info */}
         {!flipped && (
-          <View style={[styles.staticInfo, { backgroundColor: theme.bg2 }]}>
+          <View style={[styles.staticInfo, { backgroundColor: theme.bg2 }]}> 
             <Text
               style={[styles.bookTitle, { color: theme.text }]}
               numberOfLines={1}
@@ -253,6 +249,7 @@ function BookCard({ item, isLoggedIn }: { item: Book; isLoggedIn: boolean }) {
 
 export default function Books() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [books, setBooks] = useState<Book[]>([]);
   const [filtered, setFiltered] = useState<Book[]>([]);
   const [genres, setGenres] = useState<Genre[]>([]);
@@ -312,9 +309,10 @@ export default function Books() {
     setFiltered(result);
   }, [search, selectedGenre, books]);
 
+  const genresWithAll = [{ id: -1, name: t("booksScreen.allGenres") }, ...genres];
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      {/* SEARCH */}
+    <View style={[styles.container, { backgroundColor: theme.bg }]}> 
       <View
         style={[
           styles.searchWrapper,
@@ -323,36 +321,33 @@ export default function Books() {
       >
         <Ionicons name="search-outline" size={18} color={theme.text3} />
         <TextInput
-          placeholder="Search by title or author..."
+          placeholder={t("booksScreen.searchPlaceholder")}
           placeholderTextColor={theme.text3}
           value={search}
           onChangeText={setSearch}
           style={[styles.searchInput, { color: theme.text }]}
         />
         {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch("")}>
+          <TouchableOpacity onPress={() => setSearch("")}> 
             <Ionicons name="close-outline" size={20} color={theme.text3} />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* GENRES */}
       <FlatList
-        data={[{ id: -1, name: "All" }, ...genres]}
+        data={genresWithAll}
         horizontal
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => String(item.id)}
         style={styles.genreList}
         contentContainerStyle={{ paddingRight: 16 }}
         renderItem={({ item }) => {
-          const active =
-            item.name === "All" ? !selectedGenre : selectedGenre === item.name;
+          const isAll = item.id === -1;
+          const active = isAll ? !selectedGenre : selectedGenre === item.name;
           return (
             <TouchableOpacity
               onPress={() =>
-                setSelectedGenre(
-                  item.name === "All" ? null : active ? null : item.name,
-                )
+                setSelectedGenre(isAll ? null : active ? null : item.name)
               }
               style={[
                 styles.genreChip,
@@ -379,31 +374,31 @@ export default function Books() {
       />
 
       {!loading && !error && (
-        <Text style={[styles.countText, { color: theme.text3 }]}>
-          {filtered.length} book{filtered.length !== 1 ? "s" : ""} found
+        <Text style={[styles.countText, { color: theme.text3 }]}> 
+          {t("booksScreen.booksFound", { count: filtered.length })}
         </Text>
       )}
 
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.accent} />
-          <Text style={[styles.loadingText, { color: theme.text3 }]}>
-            Loading books...
+          <Text style={[styles.loadingText, { color: theme.text3 }]}> 
+            {t("booksScreen.loadingBooks")}
           </Text>
         </View>
       ) : error ? (
         <View style={styles.center}>
           <Ionicons name="warning-outline" size={32} color="#f87171" />
           <Text style={[styles.errorText]}>{error}</Text>
-          <Text style={[styles.errorHint, { color: theme.text3 }]}>
-            Check that the server is running
+          <Text style={[styles.errorHint, { color: theme.text3 }]}> 
+            {t("booksScreen.serverHint")}
           </Text>
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="book-outline" size={40} color={theme.text3} />
-          <Text style={[styles.emptyText, { color: theme.text3 }]}>
-            No books found
+          <Text style={[styles.emptyText, { color: theme.text3 }]}> 
+            {t("booksScreen.empty")}
           </Text>
         </View>
       ) : (
@@ -446,8 +441,6 @@ const styles = StyleSheet.create({
   },
   genreText: { fontSize: 13 },
   countText: { fontSize: 12, marginBottom: 12 },
-
-  // CARD
   card: {
     width: "100%",
     height: 280,

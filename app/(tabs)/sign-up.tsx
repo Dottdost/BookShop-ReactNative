@@ -13,8 +13,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
+
 export default function SignUp() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,11 +44,11 @@ export default function SignUp() {
 
   const handleRegister = async () => {
     if (!username || !email || !password || !confirmPassword) {
-      Alert.alert("Error", "All fields are required");
+      Alert.alert(t("common.error"), t("auth.allFieldsRequired"));
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
+      Alert.alert(t("common.error"), t("auth.passwordsDoNotMatch"));
       return;
     }
     pressAnim();
@@ -61,23 +64,23 @@ export default function SignUp() {
         },
         { headers: { "Content-Type": "application/json" } },
       );
-      Alert.alert("Success", "Account created!");
+      Alert.alert(t("common.success"), t("auth.accountCreated"));
       router.replace("/sign-in");
     } catch (error: any) {
       const data = error.response?.data;
-      let message = "Something went wrong";
+      let message = t("common.somethingWentWrong");
       if (
         data?.innerException?.includes("Users.email") ||
         data?.message?.includes("Users.email")
       )
-        message = "This email is already registered";
+        message = t("auth.emailTaken");
       else if (
         data?.innerException?.includes("Users.username") ||
         data?.message?.includes("Users.username")
       )
-        message = "This username is already taken";
+        message = t("auth.usernameTaken");
       else if (data?.message) message = data.message;
-      Alert.alert("Registration failed", message);
+      Alert.alert(t("auth.registrationFailed"), message);
     } finally {
       setLoading(false);
     }
@@ -86,7 +89,7 @@ export default function SignUp() {
   const fields = [
     {
       icon: "person-outline",
-      placeholder: "Username",
+      placeholder: t("auth.username"),
       value: username,
       set: setUsername,
       secure: false,
@@ -94,7 +97,7 @@ export default function SignUp() {
     },
     {
       icon: "mail-outline",
-      placeholder: "Email",
+      placeholder: t("auth.email"),
       value: email,
       set: setEmail,
       secure: false,
@@ -102,7 +105,7 @@ export default function SignUp() {
     },
     {
       icon: "lock-closed-outline",
-      placeholder: "Password",
+      placeholder: t("auth.password"),
       value: password,
       set: setPassword,
       secure: !showPass,
@@ -111,7 +114,7 @@ export default function SignUp() {
     },
     {
       icon: "shield-checkmark-outline",
-      placeholder: "Confirm Password",
+      placeholder: t("auth.confirmPassword"),
       value: confirmPassword,
       set: setConfirmPassword,
       secure: !showConfirm,
@@ -121,7 +124,7 @@ export default function SignUp() {
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}>
+    <View style={[styles.container, { backgroundColor: theme.bg }]}> 
       <View style={styles.topSection}>
         <View
           style={[
@@ -131,11 +134,9 @@ export default function SignUp() {
         >
           <Ionicons name="book" size={36} color={theme.accent} />
         </View>
-        <Text style={[styles.logo, { color: theme.accent }]}>
-          Cheshire Shelf
-        </Text>
-        <Text style={[styles.tagline, { color: theme.text3 }]}>
-          Join the world of stories
+        <Text style={[styles.logo, { color: theme.accent }]}>Cheshire Shelf</Text>
+        <Text style={[styles.tagline, { color: theme.text3 }]}> 
+          {t("auth.signUpTagline")}
         </Text>
       </View>
 
@@ -145,8 +146,8 @@ export default function SignUp() {
           { backgroundColor: theme.bg2, borderColor: theme.border },
         ]}
       >
-        <Text style={[styles.cardTitle, { color: theme.text }]}>
-          Create account
+        <Text style={[styles.cardTitle, { color: theme.text }]}> 
+          {t("auth.createAccount")}
         </Text>
 
         {fields.map(
@@ -203,11 +204,11 @@ export default function SignUp() {
             disabled={loading}
           >
             {loading ? (
-              <Text style={styles.primaryBtnText}>Creating...</Text>
+              <Text style={styles.primaryBtnText}>{t("auth.creating")}</Text>
             ) : (
               <>
                 <Ionicons name="person-add-outline" size={20} color="white" />
-                <Text style={styles.primaryBtnText}>Create Account</Text>
+                <Text style={styles.primaryBtnText}>{t("auth.createAccount")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -217,11 +218,11 @@ export default function SignUp() {
           onPress={() => router.push("/sign-in")}
           style={styles.linkRow}
         >
-          <Text style={[styles.linkText, { color: theme.text3 }]}>
-            Already have an account?{" "}
+          <Text style={[styles.linkText, { color: theme.text3 }]}> 
+            {t("auth.hasAccount")} {" "}
           </Text>
-          <Text style={[styles.linkAccent, { color: theme.accent }]}>
-            Sign in
+          <Text style={[styles.linkAccent, { color: theme.accent }]}> 
+            {t("auth.signIn")}
           </Text>
         </TouchableOpacity>
       </View>

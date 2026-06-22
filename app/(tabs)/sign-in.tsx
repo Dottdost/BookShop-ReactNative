@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 
 const storage = {
   set: async (key: string, value: string) => {
@@ -28,6 +29,7 @@ const storage = {
 
 export default function SignIn() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -51,7 +53,7 @@ export default function SignIn() {
 
   const handleLogin = async () => {
     if (!username || !password) {
-      Alert.alert("Error", "All fields are required");
+      Alert.alert(t("common.error"), t("auth.allFieldsRequired"));
       return;
     }
     pressAnim();
@@ -68,8 +70,8 @@ export default function SignIn() {
       router.replace("/profile");
     } catch (error: any) {
       Alert.alert(
-        "Login failed",
-        error.response?.data?.message || "Something went wrong",
+        t("auth.loginFailed"),
+        error.response?.data?.message || t("common.somethingWentWrong"),
       );
     } finally {
       setLoading(false);
@@ -87,11 +89,9 @@ export default function SignIn() {
         >
           <Ionicons name="book" size={36} color={theme.accent} />
         </View>
-        <Text style={[styles.logo, { color: theme.accent }]}>
-          Cheshire Shelf
-        </Text>
-        <Text style={[styles.tagline, { color: theme.text3 }]}>
-          Your world of stories awaits
+        <Text style={[styles.logo, { color: theme.accent }]}>Cheshire Shelf</Text>
+        <Text style={[styles.tagline, { color: theme.text3 }]}> 
+          {t("auth.signInTagline")}
         </Text>
       </View>
 
@@ -101,8 +101,8 @@ export default function SignIn() {
           { backgroundColor: theme.bg2, borderColor: theme.border },
         ]}
       >
-        <Text style={[styles.cardTitle, { color: theme.text }]}>
-          Welcome back
+        <Text style={[styles.cardTitle, { color: theme.text }]}> 
+          {t("auth.welcomeBack")}
         </Text>
 
         <View
@@ -118,7 +118,7 @@ export default function SignIn() {
             style={styles.inputIcon}
           />
           <TextInput
-            placeholder="Username"
+            placeholder={t("auth.username")}
             placeholderTextColor={theme.text3}
             value={username}
             onChangeText={setUsername}
@@ -140,7 +140,7 @@ export default function SignIn() {
             style={styles.inputIcon}
           />
           <TextInput
-            placeholder="Password"
+            placeholder={t("auth.password")}
             placeholderTextColor={theme.text3}
             value={password}
             onChangeText={setPassword}
@@ -166,11 +166,11 @@ export default function SignIn() {
             disabled={loading}
           >
             {loading ? (
-              <Text style={styles.primaryBtnText}>Signing in...</Text>
+              <Text style={styles.primaryBtnText}>{t("auth.signingIn")}</Text>
             ) : (
               <>
                 <Ionicons name="log-in-outline" size={20} color="white" />
-                <Text style={styles.primaryBtnText}>Sign In</Text>
+                <Text style={styles.primaryBtnText}>{t("auth.signIn")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -180,11 +180,11 @@ export default function SignIn() {
           onPress={() => router.push("/sign-up")}
           style={styles.linkRow}
         >
-          <Text style={[styles.linkText, { color: theme.text3 }]}>
-            Don't have an account?{" "}
+          <Text style={[styles.linkText, { color: theme.text3 }]}> 
+            {t("auth.noAccount")} {" "}
           </Text>
-          <Text style={[styles.linkAccent, { color: theme.accent }]}>
-            Sign up
+          <Text style={[styles.linkAccent, { color: theme.accent }]}> 
+            {t("auth.signUp")}
           </Text>
         </TouchableOpacity>
       </View>
