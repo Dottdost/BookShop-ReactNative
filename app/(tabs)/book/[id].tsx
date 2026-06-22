@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 import cartStorage from "../../hooks/cartStorage";
 
 const wishlistStorage = {
@@ -71,7 +72,7 @@ function SkeletonLoader() {
   });
 
   return (
-    <View style={[styles.skeletonContainer, { backgroundColor: theme.bg }]}>
+    <View style={[styles.skeletonContainer, { backgroundColor: theme.bg }]}> 
       <Animated.View style={[styles.skeletonImage, { backgroundColor: bg }]} />
       <View style={styles.skeletonContent}>
         <Animated.View
@@ -93,6 +94,7 @@ function SkeletonLoader() {
 
 export default function BookDetails() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [book, setBook] = useState<any>(null);
@@ -214,9 +216,8 @@ export default function BookDetails() {
   if (!book) return <SkeletonLoader />;
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.bg }]}>
+    <View style={[styles.root, { backgroundColor: theme.bg }]}> 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* ОБЛОЖКА */}
         <Animated.View
           style={[styles.imageWrapper, { transform: [{ scale: scaleImg }] }]}
         >
@@ -260,14 +261,12 @@ export default function BookDetails() {
           )}
         </Animated.View>
 
-        {/* КОНТЕНТ */}
         <Animated.View
           style={[
             styles.content,
             { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
           ]}
         >
-          {/* ТЕГИ */}
           <View style={styles.tagsRow}>
             {book.genreName && (
               <View
@@ -280,8 +279,7 @@ export default function BookDetails() {
                 ]}
               >
                 <Ionicons name="bookmark" size={11} color={theme.accent} />
-                <Text style={[styles.tagText, { color: theme.accent }]}>
-                  {" "}
+                <Text style={[styles.tagText, { color: theme.accent }]}> 
                   {book.genreName}
                 </Text>
               </View>
@@ -293,9 +291,8 @@ export default function BookDetails() {
               ]}
             >
               <Ionicons name="layers-outline" size={11} color={theme.accent} />
-              <Text style={[styles.tagText, { color: theme.accent }]}>
-                {" "}
-                {book.stock} in stock
+              <Text style={[styles.tagText, { color: theme.accent }]}> 
+                {t("bookDetails.inStock", { count: book.stock })}
               </Text>
             </View>
             {book.publisherName && (
@@ -313,8 +310,7 @@ export default function BookDetails() {
                   size={11}
                   color={theme.accent}
                 />
-                <Text style={[styles.tagText, { color: theme.accent }]}>
-                  {" "}
+                <Text style={[styles.tagText, { color: theme.accent }]}> 
                   {book.publisherName}
                 </Text>
               </View>
@@ -324,13 +320,12 @@ export default function BookDetails() {
           <Text style={[styles.title, { color: theme.text }]}>
             {book.title}
           </Text>
-          <Text style={[styles.author, { color: theme.text2 }]}>
-            by {book.author}
+          <Text style={[styles.author, { color: theme.text2 }]}> 
+            {t("bookDetails.byAuthor", { author: book.author })}
           </Text>
 
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-          {/* ОПИСАНИЕ */}
           <View
             style={[
               styles.descCard,
@@ -339,16 +334,15 @@ export default function BookDetails() {
           >
             <View style={styles.descHeader}>
               <Ionicons name="reader-outline" size={16} color={theme.accent} />
-              <Text style={[styles.sectionLabel, { color: theme.accent }]}>
-                Description
+              <Text style={[styles.sectionLabel, { color: theme.accent }]}> 
+                {t("bookDetails.description")}
               </Text>
             </View>
-            <Text style={[styles.description, { color: theme.text2 }]}>
+            <Text style={[styles.description, { color: theme.text2 }]}> 
               {book.description}
             </Text>
           </View>
 
-          {/* ДЕТАЛИ */}
           <View
             style={[
               styles.detailsCard,
@@ -357,10 +351,10 @@ export default function BookDetails() {
           >
             <View style={styles.detailRow}>
               <Ionicons name="person-outline" size={16} color={theme.text3} />
-              <Text style={[styles.detailLabel, { color: theme.text3 }]}>
-                Author
+              <Text style={[styles.detailLabel, { color: theme.text3 }]}> 
+                {t("bookDetails.author")}
               </Text>
-              <Text style={[styles.detailValue, { color: theme.text }]}>
+              <Text style={[styles.detailValue, { color: theme.text }]}> 
                 {book.author}
               </Text>
             </View>
@@ -369,10 +363,10 @@ export default function BookDetails() {
             />
             <View style={styles.detailRow}>
               <Ionicons name="bookmark-outline" size={16} color={theme.text3} />
-              <Text style={[styles.detailLabel, { color: theme.text3 }]}>
-                Genre
+              <Text style={[styles.detailLabel, { color: theme.text3 }]}> 
+                {t("bookDetails.genre")}
               </Text>
-              <Text style={[styles.detailValue, { color: theme.text }]}>
+              <Text style={[styles.detailValue, { color: theme.text }]}> 
                 {book.genreName}
               </Text>
             </View>
@@ -390,10 +384,10 @@ export default function BookDetails() {
                     size={16}
                     color={theme.text3}
                   />
-                  <Text style={[styles.detailLabel, { color: theme.text3 }]}>
-                    Publisher
+                  <Text style={[styles.detailLabel, { color: theme.text3 }]}> 
+                    {t("bookDetails.publisher")}
                   </Text>
-                  <Text style={[styles.detailValue, { color: theme.text }]}>
+                  <Text style={[styles.detailValue, { color: theme.text }]}> 
                     {book.publisherName}
                   </Text>
                 </View>
@@ -404,10 +398,10 @@ export default function BookDetails() {
             />
             <View style={styles.detailRow}>
               <Ionicons name="cube-outline" size={16} color={theme.text3} />
-              <Text style={[styles.detailLabel, { color: theme.text3 }]}>
-                In stock
+              <Text style={[styles.detailLabel, { color: theme.text3 }]}> 
+                {t("bookDetails.stock")}
               </Text>
-              <Text style={[styles.detailValue, { color: theme.text }]}>
+              <Text style={[styles.detailValue, { color: theme.text }]}> 
                 {book.stock}
               </Text>
             </View>
@@ -417,7 +411,6 @@ export default function BookDetails() {
         </Animated.View>
       </ScrollView>
 
-      {/* BOTTOM BAR */}
       <Animated.View
         style={[
           styles.bottomBar,
@@ -429,8 +422,10 @@ export default function BookDetails() {
         ]}
       >
         <View style={styles.priceRow}>
-          <Text style={[styles.priceLabel, { color: theme.text3 }]}>Price</Text>
-          <Text style={[styles.price, { color: theme.accent }]}>
+          <Text style={[styles.priceLabel, { color: theme.text3 }]}> 
+            {t("bookDetails.price")}
+          </Text>
+          <Text style={[styles.price, { color: theme.accent }]}> 
             ${book.price}
           </Text>
         </View>
@@ -448,8 +443,8 @@ export default function BookDetails() {
             size={20}
             color="white"
           />
-          <Text style={styles.cartText}>
-            {added ? "Added!" : "Add to Cart"}
+          <Text style={styles.cartText}> 
+            {added ? t("bookDetails.added") : t("bookDetails.addToCart")}
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -517,8 +512,6 @@ const styles = StyleSheet.create({
   },
   author: { fontSize: 15, marginBottom: 20 },
   divider: { height: 1, marginBottom: 20 },
-
-  // DESCRIPTION CARD
   descCard: {
     borderRadius: 16,
     padding: 16,
@@ -533,8 +526,6 @@ const styles = StyleSheet.create({
   },
   sectionLabel: { fontSize: 14, fontWeight: "600" },
   description: { fontSize: 14, lineHeight: 24 },
-
-  // DETAILS CARD
   detailsCard: {
     borderRadius: 16,
     borderWidth: 1,
@@ -550,8 +541,6 @@ const styles = StyleSheet.create({
   detailLabel: { flex: 1, fontSize: 13 },
   detailValue: { fontSize: 13, fontWeight: "600" },
   detailDivider: { height: 1, marginHorizontal: 14 },
-
-  // BOTTOM BAR
   bottomBar: {
     position: "absolute",
     bottom: 0,
