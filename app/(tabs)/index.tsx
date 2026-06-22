@@ -13,6 +13,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
+
 interface Book {
   id: string;
   title: string;
@@ -22,6 +24,7 @@ interface Book {
 
 function BookCard({ item, index }: { item: Book; index: number }) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -30,13 +33,13 @@ function BookCard({ item, index }: { item: Book; index: number }) {
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 500,
-        delay: index * 150,
+        delay: index * 120,
         useNativeDriver: false,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 500,
-        delay: index * 150,
+        delay: index * 120,
         useNativeDriver: false,
       }),
     ]).start();
@@ -51,7 +54,7 @@ function BookCard({ item, index }: { item: Book; index: number }) {
         ]}
       >
         <TouchableOpacity
-          activeOpacity={0.8}
+          activeOpacity={0.85}
           style={[
             styles.card,
             { backgroundColor: theme.bg2, borderColor: theme.border },
@@ -61,7 +64,7 @@ function BookCard({ item, index }: { item: Book; index: number }) {
 
           <View style={styles.cardBadge}>
             <Ionicons name="star" size={10} color="#f59e0b" />
-            <Text style={styles.cardBadgeText}>New</Text>
+            <Text style={styles.cardBadgeText}>{t("homeScreen.new")}</Text>
           </View>
 
           <View
@@ -81,14 +84,14 @@ function BookCard({ item, index }: { item: Book; index: number }) {
               {item.title}
             </Text>
 
-            <Text style={[styles.cardAuthor, { color: theme.text2 }]}>
+            <Text style={[styles.cardAuthor, { color: theme.text2 }]}> 
               {item.author}
             </Text>
 
             <View style={styles.readBtn}>
               <Ionicons name="book-outline" size={11} color={theme.accent} />
-              <Text style={[styles.readBtnText, { color: theme.accent }]}>
-                View
+              <Text style={[styles.readBtnText, { color: theme.accent }]}> 
+                {t("homeScreen.view")}
               </Text>
             </View>
           </View>
@@ -98,22 +101,20 @@ function BookCard({ item, index }: { item: Book; index: number }) {
   );
 }
 
-const GENRES = [
-  { label: "Romance", icon: "heart-outline" },
-  { label: "Mystery", icon: "search-outline" },
-  { label: "Dark Fiction", icon: "moon-outline" },
-  { label: "Fantasy", icon: "sparkles-outline" },
-];
-
 export default function HomeScreen() {
   const { theme } = useTheme();
-  const [text, setText] = useState("");
+  const { t } = useTranslation();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeGenre, setActiveGenre] = useState("Romance");
+  const [activeGenre, setActiveGenre] = useState("romance");
   const headerAnim = useRef(new Animated.Value(0)).current;
 
-  const fullText = "Hello, Reader!";
+  const genres = [
+    { key: "romance", label: t("homeScreen.romance"), icon: "heart-outline" },
+    { key: "mystery", label: t("homeScreen.mystery"), icon: "search-outline" },
+    { key: "dark", label: t("homeScreen.darkFiction"), icon: "moon-outline" },
+    { key: "fantasy", label: t("homeScreen.fantasy"), icon: "sparkles-outline" },
+  ];
 
   useEffect(() => {
     Animated.timing(headerAnim, {
@@ -121,19 +122,6 @@ export default function HomeScreen() {
       duration: 800,
       useNativeDriver: false,
     }).start();
-
-    let index = 0;
-
-    const interval = setInterval(() => {
-      if (index < fullText.length) {
-        setText(fullText.slice(0, index + 1));
-        index++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 60);
-
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -171,23 +159,23 @@ export default function HomeScreen() {
   }, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}>
+    <View style={[styles.container, { backgroundColor: theme.bg }]}> 
       <FlatList
         data={[]}
-        keyExtractor={() => ""}
+        keyExtractor={() => "home"}
         renderItem={null}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
-            <Animated.View style={[styles.hero, { opacity: headerAnim }]}>
+            <Animated.View style={[styles.hero, { opacity: headerAnim }]}> 
               <View style={styles.heroTop}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.greeting, { color: theme.accent }]}>
-                    {text}
+                  <Text style={[styles.greeting, { color: theme.accent }]}> 
+                    {t("homeScreen.greeting")}
                   </Text>
 
-                  <Text style={[styles.heroTitle, { color: theme.text }]}>
-                    Your next favourite{"\n"}book awaits
+                  <Text style={[styles.heroTitle, { color: theme.text }]}> 
+                    {t("homeScreen.title")}
                   </Text>
                 </View>
 
@@ -211,9 +199,9 @@ export default function HomeScreen() {
                 ]}
               >
                 {[
-                  { icon: "library-outline", num: "2.4k", label: "Books" },
-                  { icon: "people-outline", num: "18k", label: "Readers" },
-                  { icon: "star-outline", num: "4.9", label: "Rating" },
+                  { icon: "library-outline", num: "2.4k", label: t("homeScreen.books") },
+                  { icon: "people-outline", num: "18k", label: t("homeScreen.readers") },
+                  { icon: "star-outline", num: "4.9", label: t("homeScreen.rating") },
                 ].map((s, i) => (
                   <View key={s.label} style={{ flexDirection: "row", flex: 1 }}>
                     {i > 0 && (
@@ -231,10 +219,10 @@ export default function HomeScreen() {
                         size={20}
                         color={theme.accent}
                       />
-                      <Text style={[styles.statNum, { color: theme.text }]}>
+                      <Text style={[styles.statNum, { color: theme.text }]}> 
                         {s.num}
                       </Text>
-                      <Text style={[styles.statLabel, { color: theme.text3 }]}>
+                      <Text style={[styles.statLabel, { color: theme.text3 }]}> 
                         {s.label}
                       </Text>
                     </View>
@@ -250,8 +238,8 @@ export default function HomeScreen() {
               ]}
             >
               <Ionicons name="search-outline" size={18} color={theme.text3} />
-              <Text style={[styles.searchPlaceholder, { color: theme.text3 }]}>
-                Search books, authors...
+              <Text style={[styles.searchPlaceholder, { color: theme.text3 }]}> 
+                {t("homeScreen.searchPlaceholder")}
               </Text>
 
               <View
@@ -269,13 +257,13 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Genres
+              <Text style={[styles.sectionTitle, { color: theme.text }]}> 
+                {t("homeScreen.genres")}
               </Text>
 
               <TouchableOpacity style={styles.seeAllBtn}>
-                <Text style={[styles.seeAll, { color: theme.accent }]}>
-                  See all
+                <Text style={[styles.seeAll, { color: theme.accent }]}> 
+                  {t("homeScreen.seeAll")}
                 </Text>
                 <Ionicons
                   name="chevron-forward"
@@ -286,18 +274,18 @@ export default function HomeScreen() {
             </View>
 
             <FlatList
-              data={GENRES}
+              data={genres}
               horizontal
               showsHorizontalScrollIndicator={false}
-              keyExtractor={(g) => g.label}
+              keyExtractor={(g) => g.key}
               contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}
               style={{ marginBottom: 24 }}
               renderItem={({ item: g }) => {
-                const active = activeGenre === g.label;
+                const active = activeGenre === g.key;
 
                 return (
                   <TouchableOpacity
-                    onPress={() => setActiveGenre(g.label)}
+                    onPress={() => setActiveGenre(g.key)}
                     style={[
                       styles.genreChip,
                       {
@@ -329,14 +317,14 @@ export default function HomeScreen() {
             />
 
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Picks for You
+              <Text style={[styles.sectionTitle, { color: theme.text }]}> 
+                {t("homeScreen.picksForYou")}
               </Text>
 
               <Link href="/books" asChild>
                 <TouchableOpacity style={styles.seeAllBtn}>
-                  <Text style={[styles.seeAll, { color: theme.accent }]}>
-                    See all
+                  <Text style={[styles.seeAll, { color: theme.accent }]}> 
+                    {t("homeScreen.seeAll")}
                   </Text>
                   <Ionicons
                     name="chevron-forward"
@@ -373,9 +361,9 @@ export default function HomeScreen() {
 
             {books[0] && (
               <>
-                <View style={[styles.sectionHeader, { marginTop: 24 }]}>
-                  <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                    Book of the Week
+                <View style={[styles.sectionHeader, { marginTop: 24 }]}> 
+                  <Text style={[styles.sectionTitle, { color: theme.text }]}> 
+                    {t("homeScreen.bookOfTheWeek")}
                   </Text>
                 </View>
 
@@ -404,8 +392,8 @@ export default function HomeScreen() {
                           size={11}
                           color="#f59e0b"
                         />
-                        <Text style={styles.featuredBadgeText}>
-                          Editor's Pick
+                        <Text style={styles.featuredBadgeText}> 
+                          {t("homeScreen.editorsPick")}
                         </Text>
                       </View>
 
@@ -440,7 +428,9 @@ export default function HomeScreen() {
                             { backgroundColor: theme.accent },
                           ]}
                         >
-                          <Text style={styles.featuredReadText}>Read more</Text>
+                          <Text style={styles.featuredReadText}> 
+                            {t("homeScreen.readMore")}
+                          </Text>
                           <Ionicons
                             name="arrow-forward"
                             size={12}
@@ -463,16 +453,8 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 26,
-  },
-
-  hero: {
-    paddingHorizontal: 20,
-    marginBottom: 18,
-  },
-
+  container: { flex: 1, paddingTop: 26 },
+  hero: { paddingHorizontal: 20, marginBottom: 18 },
   heroTop: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -480,21 +462,18 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     gap: 12,
   },
-
   greeting: {
     fontSize: 14,
     fontWeight: "600",
     letterSpacing: 0.5,
     marginBottom: 6,
   },
-
   heroTitle: {
     fontSize: 26,
     fontWeight: "800",
     lineHeight: 34,
     letterSpacing: 0.3,
   },
-
   catIcon: {
     width: 52,
     height: 52,
@@ -503,7 +482,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   statsRow: {
     flexDirection: "row",
     borderRadius: 20,
@@ -511,27 +489,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
   },
-
-  statCard: {
-    flex: 1,
-    alignItems: "center",
-    gap: 4,
-  },
-
-  statNum: {
-    fontSize: 18,
-    fontWeight: "800",
-  },
-
-  statLabel: {
-    fontSize: 11,
-  },
-
-  statDivider: {
-    width: 1,
-    height: 40,
-  },
-
+  statCard: { flex: 1, alignItems: "center", gap: 4 },
+  statNum: { fontSize: 18, fontWeight: "800" },
+  statLabel: { fontSize: 11 },
+  statDivider: { width: 1, height: 40 },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -543,12 +504,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 10,
   },
-
-  searchPlaceholder: {
-    flex: 1,
-    fontSize: 14,
-  },
-
+  searchPlaceholder: { flex: 1, fontSize: 14 },
   searchFilter: {
     width: 30,
     height: 30,
@@ -556,7 +512,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -564,22 +519,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 14,
   },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
-
-  seeAllBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-  },
-
-  seeAll: {
-    fontSize: 13,
-  },
-
+  sectionTitle: { fontSize: 18, fontWeight: "700" },
+  seeAllBtn: { flexDirection: "row", alignItems: "center", gap: 2 },
+  seeAll: { fontSize: 13 },
   genreChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -589,15 +531,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
-
-  genreText: {
-    fontSize: 13,
-  },
-
-  cardWrapper: {
-    marginRight: 14,
-  },
-
+  genreText: { fontSize: 13 },
+  cardWrapper: { marginRight: 14 },
   card: {
     width: 148,
     height: 220,
@@ -605,12 +540,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
   },
-
-  image: {
-    width: "100%",
-    height: "100%",
-  },
-
+  image: { width: "100%", height: "100%" },
   cardBadge: {
     position: "absolute",
     top: 8,
@@ -623,43 +553,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 3,
   },
-
-  cardBadgeText: {
-    color: "#f59e0b",
-    fontSize: 10,
-    fontWeight: "600",
-  },
-
-  overlay: {
-    position: "absolute",
-    bottom: 0,
-    width: "100%",
-    padding: 10,
-    gap: 2,
-  },
-
-  bookTitle: {
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 16,
-  },
-
-  cardAuthor: {
-    fontSize: 10,
-  },
-
-  readBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 4,
-  },
-
-  readBtnText: {
-    fontSize: 10,
-    fontWeight: "600",
-  },
-
+  cardBadgeText: { color: "#f59e0b", fontSize: 10, fontWeight: "600" },
+  overlay: { position: "absolute", bottom: 0, width: "100%", padding: 10, gap: 2 },
+  bookTitle: { fontSize: 12, fontWeight: "600", lineHeight: 16 },
+  cardAuthor: { fontSize: 10 },
+  readBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  readBtnText: { fontSize: 10, fontWeight: "600" },
   featuredCard: {
     marginHorizontal: 20,
     borderRadius: 20,
@@ -668,18 +567,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 140,
   },
-
-  featuredImage: {
-    width: 100,
-    height: "100%",
-  },
-
-  featuredInfo: {
-    flex: 1,
-    padding: 14,
-    justifyContent: "space-between",
-  },
-
+  featuredImage: { width: 100, height: "100%" },
+  featuredInfo: { flex: 1, padding: 14, justifyContent: "space-between" },
   featuredBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -689,34 +578,11 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     alignSelf: "flex-start",
   },
-
-  featuredBadgeText: {
-    color: "#f59e0b",
-    fontSize: 10,
-    fontWeight: "600",
-  },
-
-  featuredTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    lineHeight: 20,
-  },
-
-  featuredAuthor: {
-    fontSize: 12,
-  },
-
-  featuredFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  starsRow: {
-    flexDirection: "row",
-    gap: 2,
-  },
-
+  featuredBadgeText: { color: "#f59e0b", fontSize: 10, fontWeight: "600" },
+  featuredTitle: { fontSize: 15, fontWeight: "700", lineHeight: 20 },
+  featuredAuthor: { fontSize: 12 },
+  featuredFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  starsRow: { flexDirection: "row", gap: 2 },
   featuredReadBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -725,10 +591,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-
-  featuredReadText: {
-    color: "white",
-    fontSize: 11,
-    fontWeight: "600",
-  },
+  featuredReadText: { color: "white", fontSize: 11, fontWeight: "600" },
 });
