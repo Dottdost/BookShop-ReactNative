@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 
 const wishlistStorage = {
   _key: (): string => {
@@ -106,7 +107,7 @@ function WishlistCard({
         },
       ]}
     >
-      <Link href={`/book/${item.id}` as any} >
+      <Link href={`/book/${item.id}` as any}>
         <TouchableOpacity style={styles.cardInner} activeOpacity={0.85}>
           <Image
             source={{ uri: item.imageUrl }}
@@ -119,7 +120,7 @@ function WishlistCard({
             >
               {item.title}
             </Text>
-            <Text style={[styles.author, { color: theme.text2 }]}>
+            <Text style={[styles.author, { color: theme.text2 }]}> 
               {item.author}
             </Text>
             <View style={styles.genreRow}>
@@ -128,12 +129,11 @@ function WishlistCard({
                 size={11}
                 color={theme.accent}
               />
-              <Text style={[styles.genre, { color: theme.accent }]}>
-                {" "}
+              <Text style={[styles.genre, { color: theme.accent }]}> 
                 {item.genreName}
               </Text>
             </View>
-            <Text style={[styles.price, { color: theme.accent }]}>
+            <Text style={[styles.price, { color: theme.accent }]}> 
               ${item.price}
             </Text>
           </View>
@@ -150,6 +150,7 @@ function WishlistCard({
 
 export default function Wishlist() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -200,25 +201,25 @@ export default function Wishlist() {
 
   if (!isLoggedIn) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.bg }]}>
+      <View style={[styles.container, { backgroundColor: theme.bg }]}> 
         <View style={styles.emptyCenter}>
           <Ionicons
             name="heart-dislike-outline"
             size={64}
             color={theme.text3}
           />
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>
-            Sign in to use Wishlist
+          <Text style={[styles.emptyTitle, { color: theme.text }]}> 
+            {t("wishlistScreen.signInTitle")}
           </Text>
-          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
-            Save books you love and come back to them anytime
+          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}> 
+            {t("wishlistScreen.signInSubtitle")}
           </Text>
-          <Link href="/sign-in" >
+          <Link href="/sign-in">
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: theme.accent }]}
             >
               <Ionicons name="log-in-outline" size={18} color="white" />
-              <Text style={styles.actionBtnText}>Sign In</Text>
+              <Text style={styles.actionBtnText}>{t("auth.signIn")}</Text>
             </TouchableOpacity>
           </Link>
         </View>
@@ -227,13 +228,13 @@ export default function Wishlist() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <Animated.View style={[styles.header, { opacity: headerAnim }]}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>
-          My Wishlist
+    <View style={[styles.container, { backgroundColor: theme.bg }]}> 
+      <Animated.View style={[styles.header, { opacity: headerAnim }]}> 
+        <Text style={[styles.headerTitle, { color: theme.text }]}> 
+          {t("wishlistScreen.myWishlist")}
         </Text>
-        <Text style={[styles.headerCount, { color: theme.accent }]}>
-          {books.length} book{books.length !== 1 ? "s" : ""}
+        <Text style={[styles.headerCount, { color: theme.accent }]}> 
+          {t("wishlistScreen.bookCount", { count: books.length })}
         </Text>
       </Animated.View>
 
@@ -244,11 +245,11 @@ export default function Wishlist() {
       ) : books.length === 0 ? (
         <View style={styles.emptyCenter}>
           <Ionicons name="heart-outline" size={64} color={theme.text3} />
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>
-            Your wishlist is empty
+          <Text style={[styles.emptyTitle, { color: theme.text }]}> 
+            {t("wishlistScreen.emptyTitle")}
           </Text>
-          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
-            Tap the heart on any book to save it here
+          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}> 
+            {t("wishlistScreen.emptySubtitle")}
           </Text>
         </View>
       ) : (
