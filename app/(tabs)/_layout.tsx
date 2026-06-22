@@ -1,3 +1,4 @@
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import SupportChatWidget from "@/components/support/SupportChatWidget";
 import { useTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 
 function CheshireGif() {
   return (
@@ -180,6 +182,8 @@ function CustomHeader({ title }: { title: string }) {
       </TouchableOpacity>
 
       <View style={styles.headerRight}>
+        <LanguageSwitcher />
+
         <TouchableOpacity
           style={[styles.iconBtn, { backgroundColor: theme.accentBg }]}
           onPress={toggleTheme}
@@ -204,6 +208,7 @@ function CustomHeader({ title }: { title: string }) {
 
 export default function Layout() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <View style={styles.root}>
@@ -211,7 +216,7 @@ export default function Layout() {
         screenOptions={{
           headerShown: true,
           header: ({ options }) => (
-            <CustomHeader title={options.title ?? "Cheshire Shelf"} />
+            <CustomHeader title={options.title ?? t("app.name")} />
           ),
           drawerStyle: {
             backgroundColor: theme.drawerBg,
@@ -229,7 +234,7 @@ export default function Layout() {
         <Drawer.Screen
           name="index"
           options={{
-            title: "Cheshire Shelf",
+            title: t("navigation.home"),
             drawerIcon: ({ color, size }) => (
               <Ionicons name="home" size={size} color={color} />
             ),
@@ -239,7 +244,7 @@ export default function Layout() {
         <Drawer.Screen
           name="books"
           options={{
-            title: "Books",
+            title: t("navigation.books"),
             drawerIcon: ({ color, size }) => (
               <Ionicons name="book" size={size} color={color} />
             ),
@@ -249,7 +254,7 @@ export default function Layout() {
         <Drawer.Screen
           name="about"
           options={{
-            title: "About Us",
+            title: t("navigation.about"),
             drawerIcon: ({ color, size }) => (
               <Ionicons name="information-circle" size={size} color={color} />
             ),
@@ -259,7 +264,7 @@ export default function Layout() {
         <Drawer.Screen
           name="contacts"
           options={{
-            title: "Contacts",
+            title: t("navigation.contacts"),
             drawerIcon: ({ color, size }) => (
               <Ionicons name="call" size={size} color={color} />
             ),
@@ -269,7 +274,7 @@ export default function Layout() {
         <Drawer.Screen
           name="profile"
           options={{
-            title: "Profile",
+            title: t("navigation.profile"),
             drawerIcon: ({ color, size }) => (
               <Ionicons name="person" size={size} color={color} />
             ),
@@ -279,7 +284,7 @@ export default function Layout() {
         <Drawer.Screen
           name="wishlist"
           options={{
-            title: "Wishlist",
+            title: t("navigation.wishlist"),
             drawerIcon: ({ color, size }) => (
               <Ionicons name="heart" size={size} color={color} />
             ),
@@ -289,7 +294,7 @@ export default function Layout() {
         <Drawer.Screen
           name="cart"
           options={{
-            title: "Cart",
+            title: t("navigation.cart"),
             drawerIcon: ({ color, size }) => (
               <Ionicons name="cart-outline" size={size} color={color} />
             ),
@@ -299,7 +304,7 @@ export default function Layout() {
         <Drawer.Screen
           name="sign-in"
           options={{
-            title: "Sign In",
+            title: t("navigation.signIn"),
             drawerItemStyle: { display: "none" },
           }}
         />
@@ -307,7 +312,7 @@ export default function Layout() {
         <Drawer.Screen
           name="sign-up"
           options={{
-            title: "Sign Up",
+            title: t("navigation.signUp"),
             drawerItemStyle: { display: "none" },
           }}
         />
@@ -315,7 +320,7 @@ export default function Layout() {
         <Drawer.Screen
           name="book/[id]"
           options={{
-            title: "Book",
+            title: t("navigation.book"),
             drawerItemStyle: { display: "none" },
           }}
         />
@@ -323,7 +328,7 @@ export default function Layout() {
         <Drawer.Screen
           name="checkout"
           options={{
-            title: "Checkout",
+            title: t("navigation.checkout"),
             drawerItemStyle: { display: "none" },
           }}
         />
@@ -331,7 +336,7 @@ export default function Layout() {
         <Drawer.Screen
           name="admin"
           options={{
-            title: "Admin Panel",
+            title: t("navigation.admin"),
             drawerIcon: ({ color, size }) => (
               <Ionicons name="shield-outline" size={size} color={color} />
             ),
