@@ -1,8 +1,8 @@
-import { changeAppLanguage, languages, type AppLanguage } from "@/i18n";
 import { useTheme } from "@/context/ThemeContext";
+import { changeAppLanguage, languages, type AppLanguage } from "@/i18n";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity } from "react-native";
+import { StyleSheet, TouchableOpacity } from "react-native";
 import { useTranslation } from "react-i18next";
 
 export default function LanguageSwitcher() {
@@ -42,29 +42,18 @@ export default function LanguageSwitcher() {
         },
       ]}
     >
-      <Ionicons name="language-outline" size={16} color={theme.accent} />
-      <Text style={[styles.text, { color: theme.text }]}>
-        {t("language.short")}
-      </Text>
+      <Ionicons name="language-outline" size={20} color={theme.accent} />
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
+    width: 38,
     height: 38,
-    minWidth: 58,
-    paddingHorizontal: 10,
     borderRadius: 19,
     borderWidth: 1,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
-  },
-  text: {
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 0.5,
   },
 });
