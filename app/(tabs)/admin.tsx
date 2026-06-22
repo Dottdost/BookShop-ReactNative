@@ -17,18 +17,20 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 
 const TABS = [
-  { key: "books", label: "Books", icon: "book-outline" },
-  { key: "users", label: "Users", icon: "people-outline" },
-  { key: "orders", label: "Orders", icon: "receipt-outline" },
-  { key: "support", label: "Support", icon: "chatbubbles-outline" },
-  { key: "promos", label: "Promos", icon: "pricetag-outline" },
-  { key: "genres", label: "Genres", icon: "bookmark-outline" },
+  { key: "books", labelKey: "adminScreen.books", icon: "book-outline" },
+  { key: "users", labelKey: "adminScreen.users", icon: "people-outline" },
+  { key: "orders", labelKey: "adminScreen.orders", icon: "receipt-outline" },
+  { key: "support", labelKey: "adminScreen.support", icon: "chatbubbles-outline" },
+  { key: "promos", labelKey: "adminScreen.promos", icon: "pricetag-outline" },
+  { key: "genres", labelKey: "adminScreen.genres", icon: "bookmark-outline" },
 ];
 
 export default function AdminPanel() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const { isAdmin, isSuperAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState("books");
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -58,17 +60,21 @@ export default function AdminPanel() {
       >
         <Ionicons name="lock-closed-outline" size={64} color={theme.text3} />
 
-        <Text style={[s.denied, { color: theme.text }]}>Access Denied</Text>
+        <Text style={[s.denied, { color: theme.text }]}> 
+          {t("adminScreen.accessDenied")}
+        </Text>
 
         <Text style={{ color: theme.text3, marginTop: 8, textAlign: "center" }}>
-          Admin privileges required
+          {t("adminScreen.privilegesRequired")}
         </Text>
 
         <TouchableOpacity
           style={[s.backBtn, { backgroundColor: theme.accent }]}
           onPress={() => router.replace("/profile")}
         >
-          <Text style={{ color: "white", fontWeight: "700" }}>Go Back</Text>
+          <Text style={{ color: "white", fontWeight: "700" }}>
+            {t("adminScreen.goBack")}
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -78,14 +84,14 @@ export default function AdminPanel() {
     <Animated.View
       style={[s.container, { backgroundColor: theme.bg, opacity: fadeAnim }]}
     >
-      <View style={[s.header, { borderBottomColor: theme.border }]}>
+      <View style={[s.header, { borderBottomColor: theme.border }]}> 
         <View>
-          <Text style={[s.headerTitle, { color: theme.text }]}>
-            Admin Panel
+          <Text style={[s.headerTitle, { color: theme.text }]}> 
+            {t("adminScreen.adminPanel")}
           </Text>
 
-          <Text style={[s.headerRole, { color: theme.accent }]}>
-            {isSuperAdmin ? "Super Admin" : "Admin"}
+          <Text style={[s.headerRole, { color: theme.accent }]}> 
+            {isSuperAdmin ? t("adminScreen.superAdmin") : t("adminScreen.admin")}
           </Text>
         </View>
 
@@ -140,7 +146,7 @@ export default function AdminPanel() {
                   fontWeight: active ? "600" : "400",
                 }}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </Text>
             </TouchableOpacity>
           );
