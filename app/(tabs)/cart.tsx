@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 import cartStorage, { CartItem } from "../hooks/cartStorage";
 
 function CartCard({
@@ -24,6 +25,7 @@ function CartCard({
   onQtyChange: (id: string, qty: number) => void;
 }) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(24)).current;
 
@@ -75,13 +77,13 @@ function CartCard({
             >
               {item.title}
             </Text>
-            <Text style={[styles.author, { color: theme.text2 }]}>
+            <Text style={[styles.author, { color: theme.text2 }]}> 
               {item.author}
             </Text>
-            <Text style={[styles.unitPrice, { color: theme.text3 }]}>
-              ${item.price} each
+            <Text style={[styles.unitPrice, { color: theme.text3 }]}> 
+              ${item.price} {t("cartScreen.each")}
             </Text>
-            <Text style={[styles.subtotal, { color: theme.accent }]}>
+            <Text style={[styles.subtotal, { color: theme.accent }]}> 
               ${(item.price * item.quantity).toFixed(2)}
             </Text>
           </View>
@@ -103,7 +105,7 @@ function CartCard({
           >
             <Ionicons name="remove" size={16} color={theme.accent} />
           </TouchableOpacity>
-          <Text style={[styles.qtyText, { color: theme.text }]}>
+          <Text style={[styles.qtyText, { color: theme.text }]}> 
             {item.quantity}
           </Text>
           <TouchableOpacity
@@ -120,6 +122,7 @@ function CartCard({
 
 export default function Cart() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const headerAnim = useRef(new Animated.Value(0)).current;
@@ -168,21 +171,21 @@ export default function Cart() {
 
   if (!isLoggedIn) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.bg }]}>
+      <View style={[styles.container, { backgroundColor: theme.bg }]}> 
         <View style={styles.emptyCenter}>
           <Ionicons name="cart-outline" size={64} color={theme.text3} />
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>
-            Sign in to use Cart
+          <Text style={[styles.emptyTitle, { color: theme.text }]}> 
+            {t("cartScreen.signInTitle")}
           </Text>
-          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
-            Add books and checkout easily
+          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}> 
+            {t("cartScreen.signInSubtitle")}
           </Text>
           <Link href="/sign-in">
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: theme.accent }]}
             >
               <Ionicons name="log-in-outline" size={18} color="white" />
-              <Text style={styles.actionBtnText}>Sign In</Text>
+              <Text style={styles.actionBtnText}>{t("auth.signIn")}</Text>
             </TouchableOpacity>
           </Link>
         </View>
@@ -191,29 +194,31 @@ export default function Cart() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <Animated.View style={[styles.header, { opacity: headerAnim }]}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>My Cart</Text>
-        <Text style={[styles.headerCount, { color: theme.accent }]}>
-          {totalItems} item{totalItems !== 1 ? "s" : ""}
+    <View style={[styles.container, { backgroundColor: theme.bg }]}> 
+      <Animated.View style={[styles.header, { opacity: headerAnim }]}> 
+        <Text style={[styles.headerTitle, { color: theme.text }]}> 
+          {t("cartScreen.myCart")}
+        </Text>
+        <Text style={[styles.headerCount, { color: theme.accent }]}> 
+          {t("cartScreen.itemCount", { count: totalItems })}
         </Text>
       </Animated.View>
 
       {items.length === 0 ? (
         <View style={styles.emptyCenter}>
           <Ionicons name="cart-outline" size={64} color={theme.text3} />
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>
-            Your cart is empty
+          <Text style={[styles.emptyTitle, { color: theme.text }]}> 
+            {t("cartScreen.emptyTitle")}
           </Text>
-          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
-            Add books from the catalogue
+          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}> 
+            {t("cartScreen.emptySubtitle")}
           </Text>
           <Link href="/books">
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: theme.accent }]}
             >
               <Ionicons name="book-outline" size={18} color="white" />
-              <Text style={styles.actionBtnText}>Browse Books</Text>
+              <Text style={styles.actionBtnText}>{t("cartScreen.browseBooks")}</Text>
             </TouchableOpacity>
           </Link>
         </View>
@@ -239,10 +244,10 @@ export default function Cart() {
             ]}
           >
             <View style={styles.totalRow}>
-              <Text style={[styles.totalLabel, { color: theme.text2 }]}>
-                Total
+              <Text style={[styles.totalLabel, { color: theme.text2 }]}> 
+                {t("common.total")}
               </Text>
-              <Text style={[styles.totalPrice, { color: theme.text }]}>
+              <Text style={[styles.totalPrice, { color: theme.text }]}> 
                 ${total.toFixed(2)}
               </Text>
             </View>
@@ -256,7 +261,7 @@ export default function Cart() {
                   onPress={handleCheckout}
                 >
                   <Ionicons name="bag-check-outline" size={20} color="white" />
-                  <Text style={styles.checkoutText}>Checkout</Text>
+                  <Text style={styles.checkoutText}>{t("cartScreen.checkout")}</Text>
                 </TouchableOpacity>
               </Link>
             </Animated.View>
@@ -359,9 +364,10 @@ const styles = StyleSheet.create({
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 24,
+    justifyContent: "center",
+    borderRadius: 16,
     paddingVertical: 14,
-    borderRadius: 14,
+    paddingHorizontal: 20,
     gap: 8,
     marginTop: 8,
   },
