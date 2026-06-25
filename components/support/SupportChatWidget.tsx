@@ -1,6 +1,12 @@
 import API_URL from "@/.expo/config/api";
 import { useAuth } from "@/app/hooks/useAuth";
 import { useTheme } from "@/context/ThemeContext";
+import {
+  joinChatGroup,
+  leaveChatGroup,
+  offReceiveMessage,
+  onReceiveMessage,
+} from "@/services/signalr";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -170,9 +176,40 @@ export default function SupportChatWidget() {
 
     const interval = setInterval(() => {
       loadMessages(chatId, false);
-    }, 3000);
+    }, 7000);
 
     return () => clearInterval(interval);
+  }, [open, chatId, token, isAdmin, isSuperAdmin]);
+
+  useEffect(() => {
+    if (!open || !chatId || !token || isAdmin || isSuperAdmin) return;
+
+    let mounted = true;
+
+    async function connectSignalR() {
+      try {
+        await joinChatGroup(chatId);
+
+        if (!mounted) return;
+
+        await onReceiveMessage(() => {
+          loadMessages(chatId, false);
+        });
+
+        console.log("SignalR joined chat:", chatId);
+      } catch (e) {
+        console.log("SignalR chat connection failed:", e);
+      }
+    }
+
+    connectSignalR();
+
+    return () => {
+      mounted = false;
+
+      offReceiveMessage().catch(() => {});
+      leaveChatGroup(chatId).catch(() => {});
+    };
   }, [open, chatId, token, isAdmin, isSuperAdmin]);
 
   useEffect(() => {

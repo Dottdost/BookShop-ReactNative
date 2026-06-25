@@ -20,7 +20,7 @@ function CheshireGif() {
   return (
     <View style={styles.gifWrap}>
       <Image
-        source={require("../../assets/images/cheshire.gif")}
+        source={require("../../assets/images/sticker.webp")}
         style={styles.cheshireGif}
         resizeMode="cover"
       />
@@ -282,6 +282,14 @@ export default function Layout() {
             drawerIcon: ({ color, size }) => (
               <Ionicons name="person" size={size} color={color} />
             ),
+          }}
+        />
+
+        <Drawer.Screen
+          name="orders"
+          options={{
+            title: t("profileScreen.myOrders") || "My Orders",
+            drawerItemStyle: { display: "none" },
           }}
         />
 

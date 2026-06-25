@@ -3,6 +3,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Animated,
@@ -16,8 +17,81 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { useTranslation } from "react-i18next";
 import cartStorage from "../hooks/cartStorage";
+
+type CardForm = {
+  cardNumber: string;
+  cardHolderName: string;
+  expirationDate: string;
+  expirationRaw: string;
+  cvv: string;
+};
+
+function authH(token: string) {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+}
+
+async function readResponse(res: Response) {
+  const text = await res.text();
+
+  if (!text) {
+    return {
+      text: "",
+      data: null,
+    };
+  }
+
+  try {
+    return {
+      text,
+      data: JSON.parse(text),
+    };
+  } catch {
+    return {
+      text,
+      data: null,
+    };
+  }
+}
+
+function cleanError(text: string, fallback: string) {
+  if (!text) return fallback;
+
+  try {
+    const json = JSON.parse(text);
+
+    if (json.errors) {
+      const messages = Object.values(json.errors).flat().join("\n");
+      return messages || json.title || fallback;
+    }
+
+    return json.title || json.message || text || fallback;
+  } catch {
+    return text || fallback;
+  }
+}
+
+function getEntityId(data: any) {
+  return String(
+    data?.id ??
+      data?.Id ??
+      data?.addressId ??
+      data?.adressId ??
+      data?.cardId ??
+      data?.bankCardId ??
+      data?.userAddressId ??
+      data?.userAdressId ??
+      data?.userBankCardId ??
+      "",
+  );
+}
+
+function formatPrice(value: number) {
+  return `$${Number(value || 0).toFixed(2)}`;
+}
 
 function CardModal({
   visible,
@@ -27,20 +101,17 @@ function CardModal({
 }: {
   visible: boolean;
   onClose: () => void;
-  onConfirm: (card: {
-    cardNumber: string;
-    cardHolderName: string;
-    expirationDate: string;
-    cvv: string;
-  }) => void;
+  onConfirm: (card: CardForm) => void;
   loading: boolean;
 }) {
   const { theme } = useTheme();
   const { t } = useTranslation();
+
   const [cardNumber, setCardNumber] = useState("");
   const [cardHolderName, setCardHolderName] = useState("");
   const [expDate, setExpDate] = useState("");
   const [cvv, setCvv] = useState("");
+
   const slideAnim = useRef(new Animated.Value(400)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -50,9 +121,10 @@ function CardModal({
       .slice(0, 16)
       .replace(/(.{4})/g, "$1 ")
       .trim();
+
   const formatExpDate = (val: string) => {
-    const c = val.replace(/\D/g, "").slice(0, 4);
-    return c.length >= 3 ? c.slice(0, 2) + "/" + c.slice(2) : c;
+    const clean = val.replace(/\D/g, "").slice(0, 4);
+    return clean.length >= 3 ? `${clean.slice(0, 2)}/${clean.slice(2)}` : clean;
   };
 
   if (visible) {
@@ -86,18 +158,47 @@ function CardModal({
   };
 
   const handleConfirm = () => {
-    if (!cardNumber || !cardHolderName || !expDate || !cvv) {
+    const cleanNumber = cardNumber.replace(/\s/g, "");
+    const cleanCvv = cvv.replace(/\D/g, "");
+    const [month, shortYear] = expDate.split("/");
+
+    if (!cleanNumber || !cardHolderName.trim() || !expDate || !cleanCvv) {
       Alert.alert(t("common.error"), t("checkoutScreen.fillCard"));
       return;
     }
-    const [month, year] = expDate.split("/");
-    const fullYear = year ? `20${year}` : "2026";
-    const expirationDate = `${fullYear}-${month?.padStart(2, "0")}-01`;
+
+    if (cleanNumber.length !== 16) {
+      Alert.alert(t("common.error"), "Card number must contain 16 digits.");
+      return;
+    }
+
+    if (!month || !shortYear || shortYear.length !== 2) {
+      Alert.alert(t("common.error"), "Expiration date must be MM/YY.");
+      return;
+    }
+
+    const monthNumber = Number(month);
+
+    if (Number.isNaN(monthNumber) || monthNumber < 1 || monthNumber > 12) {
+      Alert.alert(t("common.error"), "Expiration month is invalid.");
+      return;
+    }
+
+    if (cleanCvv.length < 4) {
+      Alert.alert(t("common.error"), "CVV must contain at least 4 digits.");
+      return;
+    }
+
+    const fullYear = `20${shortYear}`;
+
+    const expirationDate = `${fullYear}-${month.padStart(2, "0")}-01`;
+
     onConfirm({
-      cardNumber: cardNumber.replace(/\s/g, ""),
-      cardHolderName,
+      cardNumber: cleanNumber,
+      cardHolderName: cardHolderName.trim().toUpperCase(),
       expirationDate,
-      cvv: cvv.slice(0, 4),
+      expirationRaw: expDate,
+      cvv: cleanCvv,
     });
   };
 
@@ -137,10 +238,12 @@ function CardModal({
         ]}
       >
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
-        <Text style={[styles.sheetTitle, { color: theme.text }]}> 
+
+        <Text style={[styles.sheetTitle, { color: theme.text }]}>
           {t("checkoutScreen.paymentDetails")}
         </Text>
-        <Text style={[styles.sheetSubtitle, { color: theme.text3 }]}> 
+
+        <Text style={[styles.sheetSubtitle, { color: theme.text3 }]}>
           {t("checkoutScreen.paymentSubtitle")}
         </Text>
 
@@ -153,48 +256,58 @@ function CardModal({
             />
             <Text style={styles.cardChip}>VISA</Text>
           </View>
+
           <Text style={styles.cardNumberPreview}>
             {cardNumber || "•••• •••• •••• ••••"}
           </Text>
+
           <View style={styles.cardPreviewBottom}>
             <View>
-              <Text style={styles.cardLabel}>{t("checkoutScreen.cardHolder")}</Text>
+              <Text style={styles.cardLabel}>
+                {t("checkoutScreen.cardHolder")}
+              </Text>
               <Text style={styles.cardValue}>
                 {cardHolderName || t("checkoutScreen.yourName")}
               </Text>
             </View>
+
             <View>
-              <Text style={styles.cardLabel}>{t("checkoutScreen.expires")}</Text>
+              <Text style={styles.cardLabel}>
+                {t("checkoutScreen.expires")}
+              </Text>
               <Text style={styles.cardValue}>{expDate || "MM/YY"}</Text>
             </View>
           </View>
         </View>
 
-        {cardFields.map(({ icon, placeholder, value, set, keyboard, maxLen }) => (
-          <View
-            key={placeholder}
-            style={[
-              styles.inputWrapper,
-              { backgroundColor: theme.bg, borderColor: theme.border },
-            ]}
-          >
-            <Ionicons
-              name={icon as any}
-              size={16}
-              color={theme.text3}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              placeholder={placeholder}
-              placeholderTextColor={theme.text3}
-              value={value}
-              onChangeText={set}
-              style={[styles.input, { color: theme.text }]}
-              keyboardType={keyboard as any}
-              maxLength={maxLen}
-            />
-          </View>
-        ))}
+        {cardFields.map(
+          ({ icon, placeholder, value, set, keyboard, maxLen }) => (
+            <View
+              key={placeholder}
+              style={[
+                styles.inputWrapper,
+                { backgroundColor: theme.bg, borderColor: theme.border },
+              ]}
+            >
+              <Ionicons
+                name={icon as any}
+                size={16}
+                color={theme.text3}
+                style={styles.inputIcon}
+              />
+
+              <TextInput
+                placeholder={placeholder}
+                placeholderTextColor={theme.text3}
+                value={value}
+                onChangeText={set}
+                style={[styles.input, { color: theme.text }]}
+                keyboardType={keyboard as any}
+                maxLength={maxLen}
+              />
+            </View>
+          ),
+        )}
 
         <View style={styles.row}>
           <View
@@ -214,6 +327,7 @@ function CardModal({
               color={theme.text3}
               style={styles.inputIcon}
             />
+
             <TextInput
               placeholder="MM/YY"
               placeholderTextColor={theme.text3}
@@ -224,10 +338,15 @@ function CardModal({
               maxLength={5}
             />
           </View>
+
           <View
             style={[
               styles.inputWrapper,
-              { flex: 1, backgroundColor: theme.bg, borderColor: theme.border },
+              {
+                flex: 1,
+                backgroundColor: theme.bg,
+                borderColor: theme.border,
+              },
             ]}
           >
             <Ionicons
@@ -236,6 +355,7 @@ function CardModal({
               color={theme.text3}
               style={styles.inputIcon}
             />
+
             <TextInput
               placeholder="CVV"
               placeholderTextColor={theme.text3}
@@ -259,8 +379,11 @@ function CardModal({
             size={20}
             color="white"
           />
-          <Text style={styles.confirmBtnText}> 
-            {loading ? t("checkoutScreen.processing") : t("checkoutScreen.confirmAndPay")}
+
+          <Text style={styles.confirmBtnText}>
+            {loading
+              ? t("checkoutScreen.processing")
+              : t("checkoutScreen.confirmAndPay")}
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -271,14 +394,17 @@ function CardModal({
 export default function Checkout() {
   const { theme } = useTheme();
   const { t } = useTranslation();
+
   const [street, setStreet] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [country, setCountry] = useState("");
   const [promoCode, setPromoCode] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [showCardModal, setShowCardModal] = useState(false);
+
   const btnScale = useRef(new Animated.Value(1)).current;
 
   const pressAnim = () => {
@@ -296,97 +422,228 @@ export default function Checkout() {
     ]).start();
   };
 
+  const getToken = () => {
+    if (Platform.OS !== "web") return null;
+
+    return localStorage.getItem("accessToken") || localStorage.getItem("token");
+  };
+
+  const getUserId = () => {
+    if (Platform.OS !== "web") return null;
+
+    return localStorage.getItem("userId");
+  };
+
   const handlePlaceOrder = () => {
-    if (!street || !city || !country || !postalCode) {
+    const items = cartStorage.get();
+
+    if (!items.length) {
+      Alert.alert(t("common.error"), "Cart is empty.");
+      return;
+    }
+
+    if (
+      !street.trim() ||
+      !city.trim() ||
+      !country.trim() ||
+      !postalCode.trim()
+    ) {
       Alert.alert(t("common.error"), t("checkoutScreen.fillAddress"));
       return;
     }
+
     pressAnim();
     setShowCardModal(true);
   };
 
-  const handleCardConfirm = async (card: {
-    cardNumber: string;
-    cardHolderName: string;
-    expirationDate: string;
-    cvv: string;
-  }) => {
+  async function createAddress(token: string, userId: string) {
+    const payload = {
+      userId,
+      street: street.trim(),
+      city: city.trim(),
+      state: state.trim(),
+      postalCode: postalCode.trim(),
+      country: country.trim(),
+    };
+
+    console.log("ADDRESS PAYLOAD:", payload);
+
+    const res = await fetch(`${API_URL}/api/Adress`, {
+      method: "POST",
+      headers: authH(token),
+      body: JSON.stringify(payload),
+    });
+
+    const { text, data } = await readResponse(res);
+
+    if (!res.ok) {
+      console.log("ADDRESS CREATE FAILED RESPONSE:", text);
+      throw new Error(cleanError(text, `Address failed. Status ${res.status}`));
+    }
+
+    const id = getEntityId(data);
+
+    if (!id) {
+      console.log("ADDRESS RESPONSE WITHOUT ID:", data);
+      throw new Error("Address was created, but id was not returned.");
+    }
+
+    return id;
+  }
+
+  async function createCard(token: string, userId: string, card: CardForm) {
+    const payload = {
+      cardNumber: card.cardNumber,
+      cardHolderName: card.cardHolderName,
+      expirationDate: card.expirationDate,
+      cvv: card.cvv,
+      userId,
+    };
+
+    console.log("CARD PAYLOAD:", payload);
+
+    const res = await fetch(`${API_URL}/api/Card`, {
+      method: "POST",
+      headers: authH(token),
+      body: JSON.stringify(payload),
+    });
+
+    const { text, data } = await readResponse(res);
+
+    if (!res.ok) {
+      console.log("CARD CREATE FAILED RESPONSE:", text);
+      throw new Error(cleanError(text, `Card failed. Status ${res.status}`));
+    }
+
+    const id = getEntityId(data);
+
+    if (!id) {
+      console.log("CARD RESPONSE WITHOUT ID:", data);
+      throw new Error("Card was created, but id was not returned.");
+    }
+
+    return id;
+  }
+
+  function getOrderItems() {
+    const items = cartStorage.get();
+
+    const orderItems = items.map((item: any) => {
+      const bookId = item.bookId ?? item.id;
+      const quantity = Number(item.quantity ?? 1);
+
+      return {
+        bookId,
+        quantity,
+      };
+    });
+
+    const invalid = orderItems.find(
+      (item) => !item.bookId || !item.quantity || item.quantity < 1,
+    );
+
+    if (invalid) {
+      console.log("INVALID CART ITEMS:", items);
+      throw new Error("Cart item has no bookId or quantity.");
+    }
+
+    return orderItems;
+  }
+
+  async function createOrder(
+    token: string,
+    userId: string,
+    addressId: string,
+    cardId: string,
+  ) {
+    const cleanPromo = promoCode.trim();
+
+    const payload = {
+      userId,
+      userAddressId: addressId,
+      userBankCardId: cardId,
+      promoCode: cleanPromo || null,
+      orderItems: getOrderItems(),
+    };
+
+    console.log("ORDER PAYLOAD:", payload);
+
+    const res = await fetch(`${API_URL}/api/Order`, {
+      method: "POST",
+      headers: authH(token),
+      body: JSON.stringify(payload),
+    });
+
+    const { text, data } = await readResponse(res);
+
+    if (!res.ok) {
+      console.log("ORDER FAILED RESPONSE:", text);
+      throw new Error(cleanError(text, `Order failed. Status ${res.status}`));
+    }
+
+    return data;
+  }
+
+  const handleCardConfirm = async (card: CardForm) => {
     setLoading(true);
+
     try {
-      const userId =
-        Platform.OS === "web" ? localStorage.getItem("userId") : null;
-      const token =
-        Platform.OS === "web" ? localStorage.getItem("token") : null;
+      const userId = getUserId();
+      const token = getToken();
+
       if (!userId || !token) {
         Alert.alert(t("common.error"), t("checkoutScreen.notLoggedIn"));
         return;
       }
 
-      const addrRes = await fetch(`${API_URL}/api/Adress`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          userId,
-          street,
-          city,
-          state,
-          postalCode,
-          country,
-        }),
-      });
-      const addrData = await addrRes.json();
+      const addressId = await createAddress(token, userId);
+      const cardId = await createCard(token, userId, card);
 
-      const cardRes = await fetch(`${API_URL}/api/Card`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ ...card, userId }),
-      });
-      const cardData = await cardRes.json();
+      await createOrder(token, userId, addressId, cardId);
 
-      const items = cartStorage.get();
-      const orderRes = await fetch(`${API_URL}/api/Order`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          userId,
-          userAddressId: addrData.id,
-          userBankCardId: cardData.id,
-          promoCode: promoCode || null,
-          orderItems: items.map((i) => ({
-            bookId: i.bookId,
-            quantity: i.quantity,
-          })),
-        }),
-      });
-
-      if (!orderRes.ok) throw new Error(t("checkoutScreen.orderFailed"));
       cartStorage.clear();
       setShowCardModal(false);
-      Alert.alert(t("checkoutScreen.orderPlaced"), t("checkoutScreen.orderSuccess"), [
-        { text: t("checkoutScreen.ok"), onPress: () => router.replace("/cart") },
-      ]);
+
+      Alert.alert(
+        t("checkoutScreen.orderPlaced"),
+        t("checkoutScreen.orderSuccess"),
+        [
+          {
+            text: t("checkoutScreen.ok"),
+            onPress: () => router.replace("/orders"),
+          },
+        ],
+      );
     } catch (e: any) {
-      Alert.alert(t("common.error"), e.message || t("common.somethingWentWrong"));
+      Alert.alert(
+        t("common.error"),
+        e?.message || t("common.somethingWentWrong"),
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const items = cartStorage.get();
-  const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const total = items.reduce(
+    (sum: number, item: any) =>
+      sum + Number(item.price ?? 0) * Number(item.quantity ?? 1),
+    0,
+  );
 
   const addressFields = [
-    { label: t("checkoutScreen.street"), value: street, set: setStreet, icon: "home-outline" },
-    { label: t("checkoutScreen.city"), value: city, set: setCity, icon: "business-outline" },
+    {
+      label: t("checkoutScreen.street"),
+      value: street,
+      set: setStreet,
+      icon: "home-outline",
+    },
+    {
+      label: t("checkoutScreen.city"),
+      value: city,
+      set: setCity,
+      icon: "business-outline",
+    },
     {
       label: t("checkoutScreen.state"),
       value: state,
@@ -413,7 +670,7 @@ export default function Checkout() {
         style={[styles.container, { backgroundColor: theme.bg }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.pageTitle, { color: theme.text }]}> 
+        <Text style={[styles.pageTitle, { color: theme.text }]}>
           {t("checkoutScreen.title")}
         </Text>
 
@@ -425,32 +682,47 @@ export default function Checkout() {
         >
           <View style={styles.sectionHeader}>
             <Ionicons name="receipt-outline" size={14} color={theme.accent} />
-            <Text style={[styles.sectionTitle, { color: theme.accent }]}> 
+
+            <Text style={[styles.sectionTitle, { color: theme.accent }]}>
               {t("checkoutScreen.orderSummary")}
             </Text>
           </View>
-          {items.map((item) => (
-            <View key={item.bookId} style={styles.summaryRow}>
-              <Text
-                style={[styles.summaryTitle, { color: theme.text }]}
-                numberOfLines={1}
+
+          {items.length === 0 ? (
+            <Text style={{ color: theme.text3 }}>Cart is empty.</Text>
+          ) : (
+            items.map((item: any, index: number) => (
+              <View
+                key={item.bookId ?? item.id ?? index}
+                style={styles.summaryRow}
               >
-                {item.title}
-              </Text>
-              <Text style={[styles.summaryQty, { color: theme.text2 }]}> 
-                ×{item.quantity}
-              </Text>
-              <Text style={[styles.summaryPrice, { color: theme.accent }]}> 
-                ${(item.price * item.quantity).toFixed(2)}
-              </Text>
-            </View>
-          ))}
-          <View style={[styles.totalRow, { borderTopColor: theme.border }]}> 
-            <Text style={[styles.totalLabel, { color: theme.text2 }]}> 
+                <Text
+                  style={[styles.summaryTitle, { color: theme.text }]}
+                  numberOfLines={1}
+                >
+                  {item.title ?? "Book"}
+                </Text>
+
+                <Text style={[styles.summaryQty, { color: theme.text2 }]}>
+                  ×{item.quantity ?? 1}
+                </Text>
+
+                <Text style={[styles.summaryPrice, { color: theme.accent }]}>
+                  {formatPrice(
+                    Number(item.price ?? 0) * Number(item.quantity ?? 1),
+                  )}
+                </Text>
+              </View>
+            ))
+          )}
+
+          <View style={[styles.totalRow, { borderTopColor: theme.border }]}>
+            <Text style={[styles.totalLabel, { color: theme.text2 }]}>
               {t("common.total")}
             </Text>
-            <Text style={[styles.totalPrice, { color: theme.text }]}> 
-              ${total.toFixed(2)}
+
+            <Text style={[styles.totalPrice, { color: theme.text }]}>
+              {formatPrice(total)}
             </Text>
           </View>
         </View>
@@ -463,10 +735,12 @@ export default function Checkout() {
         >
           <View style={styles.sectionHeader}>
             <Ionicons name="location-outline" size={14} color={theme.accent} />
-            <Text style={[styles.sectionTitle, { color: theme.accent }]}> 
+
+            <Text style={[styles.sectionTitle, { color: theme.accent }]}>
               {t("checkoutScreen.deliveryAddress")}
             </Text>
           </View>
+
           {addressFields.map(({ label, value, set, icon }) => (
             <View
               key={label}
@@ -481,6 +755,7 @@ export default function Checkout() {
                 color={theme.text3}
                 style={styles.inputIcon}
               />
+
               <TextInput
                 placeholder={label}
                 placeholderTextColor={theme.text3}
@@ -500,10 +775,12 @@ export default function Checkout() {
         >
           <View style={styles.sectionHeader}>
             <Ionicons name="pricetag-outline" size={14} color={theme.accent} />
-            <Text style={[styles.sectionTitle, { color: theme.accent }]}> 
+
+            <Text style={[styles.sectionTitle, { color: theme.accent }]}>
               {t("checkoutScreen.promoCode")}
             </Text>
           </View>
+
           <View
             style={[
               styles.inputWrapper,
@@ -516,6 +793,7 @@ export default function Checkout() {
               color={theme.text3}
               style={styles.inputIcon}
             />
+
             <TextInput
               placeholder={t("checkoutScreen.enterPromoCode")}
               placeholderTextColor={theme.text3}
@@ -535,11 +813,22 @@ export default function Checkout() {
           }}
         >
           <TouchableOpacity
-            style={[styles.orderBtn, { backgroundColor: theme.accent }]}
+            style={[
+              styles.orderBtn,
+              {
+                backgroundColor: loading ? theme.bg3 : theme.accent,
+              },
+            ]}
             onPress={handlePlaceOrder}
+            disabled={loading}
           >
             <Ionicons name="card-outline" size={22} color="white" />
-            <Text style={styles.orderBtnText}>{t("checkoutScreen.placeOrder")}</Text>
+
+            <Text style={styles.orderBtnText}>
+              {loading
+                ? t("checkoutScreen.processing")
+                : t("checkoutScreen.placeOrder")}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>
@@ -555,7 +844,10 @@ export default function Checkout() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+  },
+
   pageTitle: {
     fontSize: 28,
     fontWeight: "800",
@@ -563,6 +855,7 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 8,
   },
+
   section: {
     margin: 16,
     marginBottom: 8,
@@ -571,17 +864,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 10,
   },
+
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     marginBottom: 4,
   },
-  sectionTitle: { fontSize: 13, fontWeight: "600" },
-  summaryRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  summaryTitle: { flex: 1, fontSize: 13 },
-  summaryQty: { fontSize: 13 },
-  summaryPrice: { fontSize: 13, fontWeight: "700" },
+
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  summaryTitle: {
+    flex: 1,
+    fontSize: 13,
+  },
+
+  summaryQty: {
+    fontSize: 13,
+  },
+
+  summaryPrice: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
   totalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -589,8 +904,16 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     marginTop: 4,
   },
-  totalLabel: { fontSize: 15 },
-  totalPrice: { fontSize: 20, fontWeight: "800" },
+
+  totalLabel: {
+    fontSize: 15,
+  },
+
+  totalPrice: {
+    fontSize: 20,
+    fontWeight: "800",
+  },
+
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
@@ -598,9 +921,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 12,
   },
-  inputIcon: { marginRight: 8 },
-  input: { flex: 1, fontSize: 14, paddingVertical: 12 },
-  row: { flexDirection: "row" },
+
+  inputIcon: {
+    marginRight: 8,
+  },
+
+  input: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 12,
+  },
+
+  row: {
+    flexDirection: "row",
+  },
+
   orderBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -610,11 +945,18 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 8,
   },
-  orderBtnText: { color: "white", fontSize: 16, fontWeight: "700" },
+
+  orderBtnText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.6)",
   },
+
   bottomSheet: {
     position: "absolute",
     bottom: 0,
@@ -628,6 +970,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     gap: 12,
   },
+
   handle: {
     width: 40,
     height: 4,
@@ -635,8 +978,17 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: 8,
   },
-  sheetTitle: { fontSize: 22, fontWeight: "800" },
-  sheetSubtitle: { fontSize: 13, marginBottom: 4 },
+
+  sheetTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+  },
+
+  sheetSubtitle: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+
   cardPreview: {
     backgroundColor: "#3b1f6e",
     borderRadius: 20,
@@ -645,17 +997,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(167,139,250,0.2)",
   },
+
   cardPreviewTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 20,
   },
+
   cardChip: {
     color: "rgba(255,255,255,0.7)",
     fontSize: 16,
     fontWeight: "700",
     letterSpacing: 2,
   },
+
   cardNumberPreview: {
     color: "white",
     fontSize: 18,
@@ -663,19 +1018,26 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     marginBottom: 20,
   },
-  cardPreviewBottom: { flexDirection: "row", justifyContent: "space-between" },
+
+  cardPreviewBottom: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+
   cardLabel: {
     color: "rgba(255,255,255,0.4)",
     fontSize: 9,
     letterSpacing: 1,
     marginBottom: 2,
   },
+
   cardValue: {
     color: "white",
     fontSize: 13,
     fontWeight: "600",
     letterSpacing: 1,
   },
+
   confirmBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -685,5 +1047,10 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 4,
   },
-  confirmBtnText: { color: "white", fontSize: 16, fontWeight: "700" },
+
+  confirmBtnText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });
