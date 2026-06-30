@@ -25,6 +25,17 @@ export async function getChatSignalRConnection() {
     return chatConnection;
   }
 
+  if (
+    chatConnection &&
+    chatConnection.state !== signalR.HubConnectionState.Disconnected
+  ) {
+    try {
+      await chatConnection.stop();
+    } catch {
+      // ignore old broken connection
+    }
+  }
+
   chatConnection = new signalR.HubConnectionBuilder()
     .withUrl(`${API_URL}/chatHub`, {
       accessTokenFactory: () => token,
@@ -55,6 +66,8 @@ export async function getChatSignalRConnection() {
 }
 
 export async function joinChatGroup(chatId: string) {
+  if (!chatId) return;
+
   const hub = await getChatSignalRConnection();
 
   if (hub.state !== signalR.HubConnectionState.Connected) return;
@@ -63,6 +76,7 @@ export async function joinChatGroup(chatId: string) {
 }
 
 export async function leaveChatGroup(chatId: string) {
+  if (!chatId) return;
   if (!chatConnection) return;
   if (chatConnection.state !== signalR.HubConnectionState.Connected) return;
 
@@ -85,6 +99,15 @@ export function removeChatMessageListener() {
   chatConnection.off("ReceiveMessage");
 }
 
+// aliases для SupportChatWidget.tsx
+export async function onReceiveMessage(callback: (...args: any[]) => void) {
+  await listenChatMessages(callback);
+}
+
+export async function offReceiveMessage() {
+  removeChatMessageListener();
+}
+
 /* =========================
    ORDER HUB
 ========================= */
@@ -95,6 +118,17 @@ export async function getOrderSignalRConnection() {
   }
 
   const token = getToken();
+
+  if (
+    orderConnection &&
+    orderConnection.state !== signalR.HubConnectionState.Disconnected
+  ) {
+    try {
+      await orderConnection.stop();
+    } catch {
+      // ignore old broken connection
+    }
+  }
 
   orderConnection = new signalR.HubConnectionBuilder()
     .withUrl(`${API_URL}/orderHub`, {
@@ -159,12 +193,20 @@ export function removeOrderStatusListener() {
 
 export async function stopSignalRConnections() {
   if (chatConnection) {
-    await chatConnection.stop();
-    chatConnection = null;
+    try {
+      removeChatMessageListener();
+      await chatConnection.stop();
+    } finally {
+      chatConnection = null;
+    }
   }
 
   if (orderConnection) {
-    await orderConnection.stop();
-    orderConnection = null;
+    try {
+      removeOrderStatusListener();
+      await orderConnection.stop();
+    } finally {
+      orderConnection = null;
+    }
   }
 }

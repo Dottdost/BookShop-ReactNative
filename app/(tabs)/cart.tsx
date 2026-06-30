@@ -77,13 +77,13 @@ function CartCard({
             >
               {item.title}
             </Text>
-            <Text style={[styles.author, { color: theme.text2 }]}> 
+            <Text style={[styles.author, { color: theme.text2 }]}>
               {item.author}
             </Text>
-            <Text style={[styles.unitPrice, { color: theme.text3 }]}> 
+            <Text style={[styles.unitPrice, { color: theme.text3 }]}>
               ${item.price} {t("cartScreen.each")}
             </Text>
-            <Text style={[styles.subtotal, { color: theme.accent }]}> 
+            <Text style={[styles.subtotal, { color: theme.accent }]}>
               ${(item.price * item.quantity).toFixed(2)}
             </Text>
           </View>
@@ -105,7 +105,7 @@ function CartCard({
           >
             <Ionicons name="remove" size={16} color={theme.accent} />
           </TouchableOpacity>
-          <Text style={[styles.qtyText, { color: theme.text }]}> 
+          <Text style={[styles.qtyText, { color: theme.text }]}>
             {item.quantity}
           </Text>
           <TouchableOpacity
@@ -171,13 +171,13 @@ export default function Cart() {
 
   if (!isLoggedIn) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.bg }]}> 
+      <View style={[styles.container, { backgroundColor: theme.bg }]}>
         <View style={styles.emptyCenter}>
           <Ionicons name="cart-outline" size={64} color={theme.text3} />
-          <Text style={[styles.emptyTitle, { color: theme.text }]}> 
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
             {t("cartScreen.signInTitle")}
           </Text>
-          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}> 
+          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
             {t("cartScreen.signInSubtitle")}
           </Text>
           <Link href="/sign-in">
@@ -194,12 +194,12 @@ export default function Cart() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}> 
-      <Animated.View style={[styles.header, { opacity: headerAnim }]}> 
-        <Text style={[styles.headerTitle, { color: theme.text }]}> 
+    <View style={[styles.container, { backgroundColor: theme.bg }]}>
+      <Animated.View style={[styles.header, { opacity: headerAnim }]}>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
           {t("cartScreen.myCart")}
         </Text>
-        <Text style={[styles.headerCount, { color: theme.accent }]}> 
+        <Text style={[styles.headerCount, { color: theme.accent }]}>
           {t("cartScreen.itemCount", { count: totalItems })}
         </Text>
       </Animated.View>
@@ -207,10 +207,10 @@ export default function Cart() {
       {items.length === 0 ? (
         <View style={styles.emptyCenter}>
           <Ionicons name="cart-outline" size={64} color={theme.text3} />
-          <Text style={[styles.emptyTitle, { color: theme.text }]}> 
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
             {t("cartScreen.emptyTitle")}
           </Text>
-          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}> 
+          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
             {t("cartScreen.emptySubtitle")}
           </Text>
           <Link href="/books">
@@ -218,7 +218,9 @@ export default function Cart() {
               style={[styles.actionBtn, { backgroundColor: theme.accent }]}
             >
               <Ionicons name="book-outline" size={18} color="white" />
-              <Text style={styles.actionBtnText}>{t("cartScreen.browseBooks")}</Text>
+              <Text style={styles.actionBtnText}>
+                {t("cartScreen.browseBooks")}
+              </Text>
             </TouchableOpacity>
           </Link>
         </View>
@@ -244,10 +246,10 @@ export default function Cart() {
             ]}
           >
             <View style={styles.totalRow}>
-              <Text style={[styles.totalLabel, { color: theme.text2 }]}> 
+              <Text style={[styles.totalLabel, { color: theme.text2 }]}>
                 {t("common.total")}
               </Text>
-              <Text style={[styles.totalPrice, { color: theme.text }]}> 
+              <Text style={[styles.totalPrice, { color: theme.text }]}>
                 ${total.toFixed(2)}
               </Text>
             </View>
@@ -261,7 +263,9 @@ export default function Cart() {
                   onPress={handleCheckout}
                 >
                   <Ionicons name="bag-check-outline" size={20} color="white" />
-                  <Text style={styles.checkoutText}>{t("cartScreen.checkout")}</Text>
+                  <Text style={styles.checkoutText}>
+                    {t("cartScreen.checkout")}
+                  </Text>
                 </TouchableOpacity>
               </Link>
             </Animated.View>
@@ -275,7 +279,7 @@ export default function Cart() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
     paddingTop: 20,
     paddingBottom: 8,
     flexDirection: "row",
@@ -300,7 +304,7 @@ const styles = StyleSheet.create({
   subtotal: { fontSize: 16, fontWeight: "800" },
   cardRight: {
     paddingVertical: 12,
-    paddingHorizontal: 10,
+    paddingHorizontal: 14,
     justifyContent: "space-between",
     alignItems: "center",
   },
@@ -367,7 +371,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 16,
     paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
     gap: 8,
     marginTop: 8,
   },

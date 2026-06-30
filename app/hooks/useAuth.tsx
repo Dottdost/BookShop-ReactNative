@@ -1,54 +1,104 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import { jwtDecode } from "jwt-decode";
+import { useCallback, useState } from "react";
 import { Platform } from "react-native";
 
-function parseJwt(token: string) {
+type JwtPayload = {
+  [key: string]: any;
+};
+
+type AuthState = {
+  isAdmin: boolean;
+  isSuperAdmin: boolean;
+  token: string | null;
+  userId: string | null;
+  roles: string[];
+  loading: boolean;
+};
+
+function normalizeRoles(rawRoles: any): string[] {
+  if (!rawRoles) return [];
+
+  if (Array.isArray(rawRoles)) {
+    return rawRoles.map(String);
+  }
+
+  if (typeof rawRoles === "string") {
+    return [rawRoles];
+  }
+
+  return [];
+}
+
+function getRolesFromToken(token: string | null): string[] {
+  if (!token) return [];
+
   try {
-    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    return JSON.parse(atob(base64));
+    const payload = jwtDecode<JwtPayload>(token);
+
+    return normalizeRoles(
+      payload?.[
+        "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
+      ] ??
+        payload?.role ??
+        payload?.roles,
+    );
   } catch {
-    return null;
+    return [];
   }
 }
 
-export function useAuth() {
-  if (Platform.OS !== "web") {
-    return {
-      isAdmin: false,
-      isSuperAdmin: false,
-      token: null,
-      userId: null,
-      roles: [],
-    };
+async function getStoredValue(key: string) {
+  if (Platform.OS === "web") {
+    return localStorage.getItem(key);
   }
 
-  const token = localStorage.getItem("token");
-  const userId = localStorage.getItem("userId");
+  const secureValue = await SecureStore.getItemAsync(key);
 
-  if (!token) {
-    return {
-      isAdmin: false,
-      isSuperAdmin: false,
-      token: null,
-      userId: null,
-      roles: [],
-    };
-  }
+  if (secureValue) return secureValue;
 
-  const payload = parseJwt(token);
+  return AsyncStorage.getItem(key);
+}
 
-  const roles =
-    payload?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ??
-    [];
+export function useAuth(): AuthState {
+  const [state, setState] = useState<AuthState>({
+    isAdmin: false,
+    isSuperAdmin: false,
+    token: null,
+    userId: null,
+    roles: [],
+    loading: true,
+  });
 
-  return {
-    token,
-    userId,
-    roles,
+  const loadAuth = useCallback(async () => {
+    const token =
+      (await getStoredValue("token")) || (await getStoredValue("accessToken"));
+    const userId = await getStoredValue("userId");
 
-    isAdmin:
-      roles.includes("Admin") ||
-      roles.includes("AppAdmin") ||
-      roles.includes("SuperAdmin"),
+    const roles = getRolesFromToken(token);
 
-    isSuperAdmin: roles.includes("SuperAdmin"),
-  };
+    setState({
+      token,
+      userId,
+      roles,
+      loading: false,
+
+      isAdmin:
+        roles.includes("Admin") ||
+        roles.includes("AppAdmin") ||
+        roles.includes("SuperAdmin"),
+
+      isSuperAdmin: roles.includes("SuperAdmin"),
+    });
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadAuth();
+    }, [loadAuth]),
+  );
+
+  return state;
 }

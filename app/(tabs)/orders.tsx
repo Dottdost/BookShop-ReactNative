@@ -19,6 +19,25 @@ import {
   View,
 } from "react-native";
 
+const PAGE_SIZE = 10;
+const FALLBACK_REFRESH_MS = 5000;
+
+const STATUS_LABELS: Record<number, string> = {
+  0: "Pending",
+  1: "Paid",
+  2: "Shipped",
+  3: "Completed",
+  4: "Canceled",
+};
+
+const STATUS_COLORS: Record<number, string> = {
+  0: "#f59e0b",
+  1: "#22c55e",
+  2: "#3b82f6",
+  3: "#8b5cf6",
+  4: "#ef4444",
+};
+
 type OrderItem = {
   bookId?: string;
   quantity?: number;
@@ -34,6 +53,7 @@ type Order = {
   orderDate?: string;
   status?: string | number;
   userAddressId?: string;
+  userAdressId?: string;
   userBankCardId?: string;
   orderItems?: OrderItem[] | { $values?: OrderItem[] };
 };
@@ -44,6 +64,7 @@ type OrdersResponse = {
   totalPages?: number;
   totalCount?: number;
   data?: Order[] | { $values?: Order[] };
+  items?: Order[] | { $values?: Order[] };
   hasPrevious?: boolean;
   hasNext?: boolean;
   $values?: Order[];
@@ -79,11 +100,15 @@ async function readResponse(res: Response) {
   }
 }
 
-function unwrapArray(data: any): any[] {
+function unwrapArray<T>(data: any): T[] {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.$values)) return data.$values;
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.data?.$values)) return data.data.$values;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.items?.$values)) return data.items.$values;
+  if (Array.isArray(data?.data?.items)) return data.data.items;
+  if (Array.isArray(data?.data?.items?.$values)) return data.data.items.$values;
   if (Array.isArray(data?.orderItems)) return data.orderItems;
   if (Array.isArray(data?.orderItems?.$values)) return data.orderItems.$values;
 
@@ -91,7 +116,7 @@ function unwrapArray(data: any): any[] {
 }
 
 function getOrderItems(order: Order): OrderItem[] {
-  return unwrapArray(order.orderItems);
+  return unwrapArray<OrderItem>(order.orderItems);
 }
 
 function formatPrice(value?: number) {
@@ -114,28 +139,38 @@ function formatDate(value?: string) {
   });
 }
 
+function getStatusNumber(status?: string | number): number {
+  if (typeof status === "number") return status;
+
+  const raw = String(status ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (raw === "0" || raw.includes("pending")) return 0;
+  if (raw === "1" || raw.includes("paid")) return 1;
+  if (raw === "2" || raw.includes("shipped")) return 2;
+  if (raw === "3" || raw.includes("completed")) return 3;
+  if (raw === "4" || raw.includes("canceled") || raw.includes("cancelled")) {
+    return 4;
+  }
+
+  const numeric = Number(raw);
+
+  if (!Number.isNaN(numeric)) return numeric;
+
+  return 0;
+}
+
 function getStatusText(status?: string | number) {
-  const raw = String(status ?? "").toLowerCase();
+  const statusNumber = getStatusNumber(status);
 
-  if (raw === "0" || raw.includes("pending")) return "Pending";
-  if (raw === "1" || raw.includes("Paid")) return "Paid";
-  if (raw === "2" || raw.includes("shipped")) return "Shipped";
-  if (raw === "3" || raw.includes("delivered")) return "Delivered";
-  if (raw === "4" || raw.includes("cancel")) return "Cancelled";
-
-  return String(status ?? "Unknown");
+  return STATUS_LABELS[statusNumber] ?? String(status ?? "Unknown");
 }
 
 function getStatusColor(status?: string | number) {
-  const text = getStatusText(status).toLowerCase();
+  const statusNumber = getStatusNumber(status);
 
-  if (text.includes("pending")) return "#f59e0b";
-  if (text.includes("Paid")) return "#3b82f6";
-  if (text.includes("shipped")) return "#8b5cf6";
-  if (text.includes("delivered")) return "#22c55e";
-  if (text.includes("cancel")) return "#ef4444";
-
-  return "#64748b";
+  return STATUS_COLORS[statusNumber] ?? "#64748b";
 }
 
 function cleanError(text: string, fallback: string) {
@@ -161,13 +196,20 @@ function normalizeSignalROrderEvent(args: any[]) {
   if (first && typeof first === "object") {
     return {
       orderId: String(
-        first.orderId ?? first.id ?? first.OrderId ?? first.Id ?? "",
+        first.orderId ??
+          first.id ??
+          first.OrderId ??
+          first.Id ??
+          first.orderID ??
+          "",
       ),
       status:
         first.status ??
         first.Status ??
         first.newStatus ??
         first.NewStatus ??
+        first.orderStatus ??
+        first.OrderStatus ??
         null,
     };
   }
@@ -176,6 +218,18 @@ function normalizeSignalROrderEvent(args: any[]) {
     orderId: String(args[0] ?? ""),
     status: args[1] ?? null,
   };
+}
+
+function mergeOrders(prev: Order[], next: Order[]) {
+  const map = new Map<string, Order>();
+
+  [...prev, ...next].forEach((order) => {
+    if (order?.id) {
+      map.set(String(order.id), order);
+    }
+  });
+
+  return Array.from(map.values());
 }
 
 export default function OrdersScreen() {
@@ -194,6 +248,12 @@ export default function OrdersScreen() {
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+  const refreshTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearRefreshTimers = () => {
+    refreshTimers.current.forEach((timer) => clearTimeout(timer));
+    refreshTimers.current = [];
+  };
 
   const animate = () => {
     fadeAnim.setValue(0);
@@ -229,7 +289,7 @@ export default function OrdersScreen() {
       setError("");
 
       const res = await fetch(
-        `${API_URL}/api/Order/user/${userId}?page=${nextPage}&pageSize=10`,
+        `${API_URL}/api/Order/user/${userId}?page=${nextPage}&pageSize=${PAGE_SIZE}`,
         {
           method: "GET",
           headers: authH(token),
@@ -245,18 +305,12 @@ export default function OrdersScreen() {
       }
 
       const response = data as OrdersResponse;
-      const list = unwrapArray(response);
+      const list = unwrapArray<Order>(response);
 
       setOrders((prev) => {
         if (!append) return list;
 
-        const map = new Map<string, Order>();
-
-        [...prev, ...list].forEach((order) => {
-          if (order?.id) map.set(order.id, order);
-        });
-
-        return Array.from(map.values());
+        return mergeOrders(prev, list);
       });
 
       setPage(Number(response?.page ?? nextPage));
@@ -272,8 +326,22 @@ export default function OrdersScreen() {
     }
   }
 
+  const silentRefreshWithDelay = useCallback(
+    (delay: number) => {
+      if (!token || !userId) return;
+
+      const timer = setTimeout(() => {
+        void loadOrders(1, false, true);
+      }, delay);
+
+      refreshTimers.current.push(timer);
+    },
+    [token, userId],
+  );
+
   const refresh = async () => {
     setRefreshing(true);
+    clearRefreshTimers();
     await loadOrders(1, false);
   };
 
@@ -286,13 +354,16 @@ export default function OrdersScreen() {
   useFocusEffect(
     useCallback(() => {
       animate();
-      loadOrders(1, false);
+      void loadOrders(1, false);
 
       const interval = setInterval(() => {
-        loadOrders(1, false, true);
-      }, 8000);
+        void loadOrders(1, false, true);
+      }, FALLBACK_REFRESH_MS);
 
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        clearRefreshTimers();
+      };
     }, [token, userId]),
   );
 
@@ -324,7 +395,11 @@ export default function OrdersScreen() {
             );
           }
 
-          loadOrders(1, false, true);
+          clearRefreshTimers();
+
+          void loadOrders(1, false, true);
+          silentRefreshWithDelay(1200);
+          silentRefreshWithDelay(4000);
         });
 
         if (mounted) {
@@ -339,13 +414,14 @@ export default function OrdersScreen() {
       }
     }
 
-    connectOrdersSignalR();
+    void connectOrdersSignalR();
 
     return () => {
       mounted = false;
+      clearRefreshTimers();
       removeOrderStatusListener();
     };
-  }, [token, userId]);
+  }, [token, userId, silentRefreshWithDelay]);
 
   const renderOrder = ({ item }: { item: Order }) => {
     const statusText = getStatusText(item.status);
@@ -494,8 +570,8 @@ export default function OrdersScreen() {
 
           <Text style={[styles.subtitle, { color: theme.text3 }]}>
             {signalRConnected
-              ? "Live status updates enabled"
-              : "Status updates every few seconds"}
+              ? "Live updates + backup refresh"
+              : "Backup refresh every few seconds"}
           </Text>
         </View>
 
@@ -649,7 +725,7 @@ const styles = StyleSheet.create({
 
   statusBadge: {
     borderWidth: 1,
-    paddingHorizontal: 10,
+    paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 999,
   },
@@ -728,7 +804,7 @@ const styles = StyleSheet.create({
 
   primaryBtn: {
     marginTop: 18,
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
     paddingVertical: 13,
     borderRadius: 14,
   },

@@ -13,20 +13,23 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import PaginationBar from "./PaginationBar";
+
+const PAGE_SIZE = 10;
 
 const STATUS_LABELS: Record<number, string> = {
   0: "Pending",
-  1: "Processing",
+  1: "Paid",
   2: "Shipped",
-  3: "Delivered",
-  4: "Cancelled",
+  3: "Completed",
+  4: "Canceled",
 };
 
 const STATUS_COLORS: Record<number, string> = {
   0: "#f59e0b",
-  1: "#8b5cf6",
+  1: "#22c55e",
   2: "#3b82f6",
-  3: "#22c55e",
+  3: "#8b5cf6",
   4: "#f87171",
 };
 
@@ -45,8 +48,19 @@ type Order = {
   orderDate?: string;
   status?: number | string;
   userAddressId?: string;
+  userAdressId?: string;
   userBankCardId?: string;
   orderItems?: { $values?: OrderItem[] } | OrderItem[];
+};
+
+type PagedResult<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  totalCount: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
 };
 
 function getWebToken() {
@@ -70,9 +84,36 @@ function unwrapOrders(data: any): Order[] {
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.data?.$values)) return data.data.$values;
   if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.items?.$values)) return data.items.$values;
   if (Array.isArray(data?.data?.items)) return data.data.items;
+  if (Array.isArray(data?.data?.items?.$values)) return data.data.items.$values;
 
   return [];
+}
+
+function unwrapPaged<T>(
+  data: any,
+  fallbackPage: number,
+  fallbackPageSize: number,
+): PagedResult<T> {
+  const items = unwrapOrders(data) as T[];
+  const totalCount = Number(data?.totalCount ?? items.length);
+  const pageSize = Number(data?.pageSize ?? fallbackPageSize);
+  const page = Number(data?.page ?? fallbackPage);
+  const totalPages = Math.max(
+    1,
+    Number((data?.totalPages ?? Math.ceil(totalCount / pageSize)) || 1),
+  );
+
+  return {
+    items,
+    page,
+    pageSize,
+    totalPages,
+    totalCount,
+    hasPrevious: Boolean(data?.hasPrevious ?? page > 1),
+    hasNext: Boolean(data?.hasNext ?? page < totalPages),
+  };
 }
 
 async function readResponse(res: Response) {
@@ -119,13 +160,19 @@ function getStatusNumber(status: number | string | undefined): number {
   if (typeof status === "number") return status;
 
   if (typeof status === "string") {
+    const normalized = status.trim().toLowerCase();
+
     const byLabel = Object.entries(STATUS_LABELS).find(
-      ([, label]) => label.toLowerCase() === status.toLowerCase(),
+      ([, label]) => label.toLowerCase() === normalized,
     );
 
     if (byLabel) return Number(byLabel[0]);
 
+    // на всякий случай, если backend где-то вернёт британское написание
+    if (normalized === "cancelled") return 4;
+
     const numeric = Number(status);
+
     if (!Number.isNaN(numeric)) return numeric;
   }
 
@@ -143,6 +190,16 @@ function shortenId(id?: string): string {
   return id.length > 8 ? id.slice(0, 8) : id;
 }
 
+function formatDate(value?: string) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleDateString();
+}
+
 export default function OrderManager() {
   const { theme } = useTheme();
   const { token: authToken } = useAuth();
@@ -153,6 +210,11 @@ export default function OrderManager() {
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   const [messageModal, setMessageModal] = useState({
     visible: false,
@@ -190,7 +252,7 @@ export default function OrderManager() {
     });
   };
 
-  const load = async () => {
+  const load = async (currentPage = page) => {
     try {
       setLoading(true);
 
@@ -200,12 +262,15 @@ export default function OrderManager() {
           "Token not found. Please log in again as SuperAdmin.",
           "error",
         );
+
         setOrders([]);
+        setTotalCount(0);
+        setTotalPages(1);
         return;
       }
 
       const res = await fetch(
-        `${API_URL}/api/Order/get-all-orders?page=1&pageSize=50`,
+        `${API_URL}/api/Order/get-all-orders?page=${currentPage}&pageSize=${PAGE_SIZE}`,
         {
           method: "GET",
           headers: authH(token),
@@ -220,11 +285,20 @@ export default function OrderManager() {
           cleanError(text, `Status ${res.status}. Please log in again.`),
           "error",
         );
+
         setOrders([]);
+        setTotalCount(0);
+        setTotalPages(1);
         return;
       }
 
-      setOrders(unwrapOrders(data));
+      const paged = unwrapPaged<Order>(data, currentPage, PAGE_SIZE);
+
+      setOrders(paged.items);
+      setPage(paged.page);
+      setPageSize(paged.pageSize);
+      setTotalPages(paged.totalPages);
+      setTotalCount(paged.totalCount);
     } catch (e: any) {
       showMessage("Error", e?.message || "Error loading orders", "error");
     } finally {
@@ -233,8 +307,8 @@ export default function OrderManager() {
   };
 
   useEffect(() => {
-    load();
-  }, [token]);
+    void load(page);
+  }, [token, page]);
 
   const openStatusModal = (order: Order) => {
     setStatusModal({
@@ -262,6 +336,15 @@ export default function OrderManager() {
       visible: false,
       order: null,
     });
+  };
+
+  const refreshAfterDelete = async () => {
+    if (orders.length === 1 && page > 1) {
+      setPage((prev) => prev - 1);
+      return;
+    }
+
+    await load(page);
   };
 
   const changeStatus = async (status: number) => {
@@ -292,8 +375,11 @@ export default function OrderManager() {
       }
 
       closeStatusModal();
-      showMessage("Success", "Order status updated.");
-      await load();
+      showMessage(
+        "Success",
+        `Order status changed to ${STATUS_LABELS[status]}.`,
+      );
+      await load(page);
     } catch (e: any) {
       showMessage("Error", e?.message || "Error updating status", "error");
     }
@@ -327,7 +413,7 @@ export default function OrderManager() {
 
       closeDeleteModal();
       showMessage("Deleted", "Order deleted successfully.");
-      await load();
+      await refreshAfterDelete();
     } catch (e: any) {
       showMessage("Error", e?.message || "Error deleting order", "error");
     }
@@ -343,10 +429,10 @@ export default function OrderManager() {
             style={{
               color: theme.accent,
               fontSize: 13,
-              fontWeight: "600",
+              fontWeight: "700",
             }}
           >
-            {orders.length}
+            {totalCount}
           </Text>
         </View>
       </View>
@@ -354,74 +440,100 @@ export default function OrderManager() {
       {loading ? (
         <ActivityIndicator color={theme.accent} style={{ marginTop: 20 }} />
       ) : (
-        <FlatList
-          data={orders}
-          keyExtractor={(item, index) => item.id || String(index)}
-          contentContainerStyle={{ paddingBottom: 40 }}
-          renderItem={({ item }) => {
-            const statusNum = getStatusNumber(item.status);
-            const color = STATUS_COLORS[statusNum] || "#888";
-            const itemsCount = getItemsCount(item.orderItems);
+        <>
+          <FlatList
+            data={orders}
+            keyExtractor={(item, index) => item.id || String(index)}
+            contentContainerStyle={{ paddingBottom: 10 }}
+            renderItem={({ item }) => {
+              const statusNum = getStatusNumber(item.status);
+              const color = STATUS_COLORS[statusNum] || "#888";
+              const itemsCount = getItemsCount(item.orderItems);
 
-            return (
-              <View
-                style={[
-                  s.card,
-                  {
-                    backgroundColor: theme.bg2,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.cardTitle, { color: theme.text }]}>
-                    Order #{shortenId(item.id)}
-                  </Text>
+              return (
+                <View
+                  style={[
+                    s.card,
+                    {
+                      backgroundColor: theme.bg2,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.cardTitle, { color: theme.text }]}>
+                      Order #{shortenId(item.id)}
+                    </Text>
 
-                  <Text style={[s.cardSub, { color: theme.text2 }]}>
-                    ${item.finalPrice ?? 0} · {itemsCount} item
-                    {itemsCount !== 1 ? "s" : ""}
-                  </Text>
+                    <Text style={[s.cardSub, { color: theme.text2 }]}>
+                      ${item.finalPrice ?? 0} · {itemsCount} item
+                      {itemsCount !== 1 ? "s" : ""}
+                    </Text>
 
-                  {!!item.promoCode && (
                     <Text style={[s.cardSub, { color: theme.text3 }]}>
-                      Promo: {item.promoCode}
+                      {formatDate(item.orderDate)}
                     </Text>
-                  )}
 
-                  <View style={[s.pill, { backgroundColor: `${color}20` }]}>
-                    <Text style={{ color, fontSize: 11 }}>
-                      {STATUS_LABELS[statusNum] ?? String(item.status)}
-                    </Text>
+                    {!!item.promoCode && (
+                      <Text style={[s.cardSub, { color: theme.text3 }]}>
+                        Promo: {item.promoCode}
+                      </Text>
+                    )}
+
+                    <View style={[s.pill, { backgroundColor: `${color}20` }]}>
+                      <Text style={{ color, fontSize: 11, fontWeight: "700" }}>
+                        {STATUS_LABELS[statusNum] ?? String(item.status)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={s.actions}>
+                    <TouchableOpacity
+                      style={[s.iconBtn, { backgroundColor: theme.accentBg }]}
+                      onPress={() => openStatusModal(item)}
+                    >
+                      <Ionicons
+                        name="swap-horizontal-outline"
+                        size={15}
+                        color={theme.accent}
+                      />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        s.iconBtn,
+                        { backgroundColor: "rgba(248,113,113,0.12)" },
+                      ]}
+                      onPress={() => openDeleteModal(item)}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={15}
+                        color="#f87171"
+                      />
+                    </TouchableOpacity>
                   </View>
                 </View>
+              );
+            }}
+          />
 
-                <View style={s.actions}>
-                  <TouchableOpacity
-                    style={[s.iconBtn, { backgroundColor: theme.accentBg }]}
-                    onPress={() => openStatusModal(item)}
-                  >
-                    <Ionicons
-                      name="swap-horizontal-outline"
-                      size={15}
-                      color={theme.accent}
-                    />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      s.iconBtn,
-                      { backgroundColor: "rgba(248,113,113,0.12)" },
-                    ]}
-                    onPress={() => openDeleteModal(item)}
-                  >
-                    <Ionicons name="trash-outline" size={15} color="#f87171" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          }}
-        />
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            loading={loading}
+            accent={theme.accent}
+            accentBg={theme.accentBg}
+            bg={theme.bg}
+            bg2={theme.bg2}
+            border={theme.border}
+            text={theme.text}
+            text2={theme.text2}
+            onPageChange={setPage}
+          />
+        </>
       )}
 
       <Modal visible={statusModal.visible} transparent animationType="fade">
@@ -448,13 +560,15 @@ export default function OrderManager() {
             </Text>
 
             <Text style={[s.modalMessage, { color: theme.text2 }]}>
-              Select new order status
+              Backend statuses: Pending, Paid, Shipped, Completed, Canceled
             </Text>
 
             <View style={{ width: "100%", gap: 8, marginTop: 8 }}>
               {Object.entries(STATUS_LABELS).map(([val, label]) => {
                 const statusValue = Number(val);
                 const color = STATUS_COLORS[statusValue];
+                const current =
+                  getStatusNumber(statusModal.order?.status) === statusValue;
 
                 return (
                   <TouchableOpacity
@@ -462,15 +576,31 @@ export default function OrderManager() {
                     style={[
                       s.statusOption,
                       {
-                        backgroundColor: `${color}18`,
-                        borderColor: `${color}55`,
+                        borderColor: current ? color : theme.border,
+                        backgroundColor: current ? `${color}18` : theme.bg,
                       },
                     ]}
                     onPress={() => changeStatus(statusValue)}
                   >
                     <View style={[s.statusDot, { backgroundColor: color }]} />
 
-                    <Text style={{ color, fontWeight: "700" }}>{label}</Text>
+                    <Text
+                      style={{
+                        flex: 1,
+                        color: current ? color : theme.text,
+                        fontWeight: current ? "800" : "700",
+                      }}
+                    >
+                      {label}
+                    </Text>
+
+                    {current && (
+                      <Ionicons
+                        name="checkmark-circle-outline"
+                        size={18}
+                        color={color}
+                      />
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -505,7 +635,7 @@ export default function OrderManager() {
                 { backgroundColor: "rgba(248,113,113,0.12)" },
               ]}
             >
-              <Ionicons name="trash-outline" size={30} color="#f87171" />
+              <Ionicons name="trash-outline" size={28} color="#f87171" />
             </View>
 
             <Text style={[s.modalTitle, { color: theme.text }]}>
@@ -513,8 +643,7 @@ export default function OrderManager() {
             </Text>
 
             <Text style={[s.modalMessage, { color: theme.text2 }]}>
-              Are you sure you want to delete Order #
-              {shortenId(deleteModal.order?.id)}? This action cannot be undone.
+              Are you sure you want to delete this order?
             </Text>
 
             <View style={s.btns}>
@@ -531,7 +660,7 @@ export default function OrderManager() {
                 style={[s.btn, { backgroundColor: "#ef4444" }]}
                 onPress={deleteOrder}
               >
-                <Text style={{ color: "white", fontWeight: "700" }}>
+                <Text style={{ color: "white", fontWeight: "800" }}>
                   Delete
                 </Text>
               </TouchableOpacity>
@@ -587,7 +716,7 @@ export default function OrderManager() {
                 setMessageModal((prev) => ({ ...prev, visible: false }))
               }
             >
-              <Text style={{ color: "white", fontWeight: "700" }}>Okay</Text>
+              <Text style={{ color: "white", fontWeight: "800" }}>Okay</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -606,11 +735,11 @@ const s = StyleSheet.create({
 
   title: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: "800",
   },
 
   badge: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 14,
     paddingVertical: 4,
     borderRadius: 12,
   },
@@ -627,7 +756,7 @@ const s = StyleSheet.create({
 
   cardTitle: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     marginBottom: 2,
   },
 
@@ -638,7 +767,7 @@ const s = StyleSheet.create({
 
   pill: {
     alignSelf: "flex-start",
-    paddingHorizontal: 8,
+    paddingHorizontal: 14,
     paddingVertical: 2,
     borderRadius: 8,
   },

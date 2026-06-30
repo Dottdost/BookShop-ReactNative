@@ -847,7 +847,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     borderWidth: 1,
     borderRadius: 18,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     gap: 8,
     zIndex: 2,
@@ -870,7 +870,7 @@ const styles = StyleSheet.create({
 
   retryBtn: {
     marginTop: 16,
-    paddingHorizontal: 18,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 14,
   },

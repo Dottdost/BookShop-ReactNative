@@ -124,7 +124,7 @@ export default function SignUp() {
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}> 
+    <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <View style={styles.topSection}>
         <View
           style={[
@@ -134,8 +134,10 @@ export default function SignUp() {
         >
           <Ionicons name="book" size={36} color={theme.accent} />
         </View>
-        <Text style={[styles.logo, { color: theme.accent }]}>Cheshire Shelf</Text>
-        <Text style={[styles.tagline, { color: theme.text3 }]}> 
+        <Text style={[styles.logo, { color: theme.accent }]}>
+          Cheshire Shelf
+        </Text>
+        <Text style={[styles.tagline, { color: theme.text3 }]}>
           {t("auth.signUpTagline")}
         </Text>
       </View>
@@ -146,7 +148,7 @@ export default function SignUp() {
           { backgroundColor: theme.bg2, borderColor: theme.border },
         ]}
       >
-        <Text style={[styles.cardTitle, { color: theme.text }]}> 
+        <Text style={[styles.cardTitle, { color: theme.text }]}>
           {t("auth.createAccount")}
         </Text>
 
@@ -208,7 +210,9 @@ export default function SignUp() {
             ) : (
               <>
                 <Ionicons name="person-add-outline" size={20} color="white" />
-                <Text style={styles.primaryBtnText}>{t("auth.createAccount")}</Text>
+                <Text style={styles.primaryBtnText}>
+                  {t("auth.createAccount")}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -218,10 +222,10 @@ export default function SignUp() {
           onPress={() => router.push("/sign-in")}
           style={styles.linkRow}
         >
-          <Text style={[styles.linkText, { color: theme.text3 }]}> 
-            {t("auth.hasAccount")} {" "}
+          <Text style={[styles.linkText, { color: theme.text3 }]}>
+            {t("auth.hasAccount")}{" "}
           </Text>
-          <Text style={[styles.linkAccent, { color: theme.accent }]}> 
+          <Text style={[styles.linkAccent, { color: theme.accent }]}>
             {t("auth.signIn")}
           </Text>
         </TouchableOpacity>
@@ -251,11 +255,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 14,
     borderWidth: 1,
+    minHeight: 56,
     marginBottom: 14,
     paddingHorizontal: 14,
   },
   inputIcon: { marginRight: 10 },
-  input: { flex: 1, fontSize: 15, paddingVertical: 14 },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+  },
   eyeBtn: { padding: 4 },
   primaryBtn: {
     flexDirection: "row",

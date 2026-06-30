@@ -89,8 +89,10 @@ export default function SignIn() {
         >
           <Ionicons name="book" size={36} color={theme.accent} />
         </View>
-        <Text style={[styles.logo, { color: theme.accent }]}>Cheshire Shelf</Text>
-        <Text style={[styles.tagline, { color: theme.text3 }]}> 
+        <Text style={[styles.logo, { color: theme.accent }]}>
+          Cheshire Shelf
+        </Text>
+        <Text style={[styles.tagline, { color: theme.text3 }]}>
           {t("auth.signInTagline")}
         </Text>
       </View>
@@ -101,7 +103,7 @@ export default function SignIn() {
           { backgroundColor: theme.bg2, borderColor: theme.border },
         ]}
       >
-        <Text style={[styles.cardTitle, { color: theme.text }]}> 
+        <Text style={[styles.cardTitle, { color: theme.text }]}>
           {t("auth.welcomeBack")}
         </Text>
 
@@ -180,10 +182,10 @@ export default function SignIn() {
           onPress={() => router.push("/sign-up")}
           style={styles.linkRow}
         >
-          <Text style={[styles.linkText, { color: theme.text3 }]}> 
-            {t("auth.noAccount")} {" "}
+          <Text style={[styles.linkText, { color: theme.text3 }]}>
+            {t("auth.noAccount")}{" "}
           </Text>
-          <Text style={[styles.linkAccent, { color: theme.accent }]}> 
+          <Text style={[styles.linkAccent, { color: theme.accent }]}>
             {t("auth.signUp")}
           </Text>
         </TouchableOpacity>
@@ -213,11 +215,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 14,
     borderWidth: 1,
+    minHeight: 56,
     marginBottom: 14,
     paddingHorizontal: 14,
   },
   inputIcon: { marginRight: 10 },
-  input: { flex: 1, fontSize: 15, paddingVertical: 14 },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+  },
   eyeBtn: { padding: 4 },
   primaryBtn: {
     flexDirection: "row",

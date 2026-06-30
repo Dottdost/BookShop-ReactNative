@@ -120,7 +120,7 @@ function WishlistCard({
             >
               {item.title}
             </Text>
-            <Text style={[styles.author, { color: theme.text2 }]}> 
+            <Text style={[styles.author, { color: theme.text2 }]}>
               {item.author}
             </Text>
             <View style={styles.genreRow}>
@@ -129,11 +129,11 @@ function WishlistCard({
                 size={11}
                 color={theme.accent}
               />
-              <Text style={[styles.genre, { color: theme.accent }]}> 
+              <Text style={[styles.genre, { color: theme.accent }]}>
                 {item.genreName}
               </Text>
             </View>
-            <Text style={[styles.price, { color: theme.accent }]}> 
+            <Text style={[styles.price, { color: theme.accent }]}>
               ${item.price}
             </Text>
           </View>
@@ -201,17 +201,17 @@ export default function Wishlist() {
 
   if (!isLoggedIn) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.bg }]}> 
+      <View style={[styles.container, { backgroundColor: theme.bg }]}>
         <View style={styles.emptyCenter}>
           <Ionicons
             name="heart-dislike-outline"
             size={64}
             color={theme.text3}
           />
-          <Text style={[styles.emptyTitle, { color: theme.text }]}> 
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
             {t("wishlistScreen.signInTitle")}
           </Text>
-          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}> 
+          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
             {t("wishlistScreen.signInSubtitle")}
           </Text>
           <Link href="/sign-in">
@@ -228,12 +228,12 @@ export default function Wishlist() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}> 
-      <Animated.View style={[styles.header, { opacity: headerAnim }]}> 
-        <Text style={[styles.headerTitle, { color: theme.text }]}> 
+    <View style={[styles.container, { backgroundColor: theme.bg }]}>
+      <Animated.View style={[styles.header, { opacity: headerAnim }]}>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
           {t("wishlistScreen.myWishlist")}
         </Text>
-        <Text style={[styles.headerCount, { color: theme.accent }]}> 
+        <Text style={[styles.headerCount, { color: theme.accent }]}>
           {t("wishlistScreen.bookCount", { count: books.length })}
         </Text>
       </Animated.View>
@@ -245,10 +245,10 @@ export default function Wishlist() {
       ) : books.length === 0 ? (
         <View style={styles.emptyCenter}>
           <Ionicons name="heart-outline" size={64} color={theme.text3} />
-          <Text style={[styles.emptyTitle, { color: theme.text }]}> 
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
             {t("wishlistScreen.emptyTitle")}
           </Text>
-          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}> 
+          <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
             {t("wishlistScreen.emptySubtitle")}
           </Text>
         </View>
@@ -270,7 +270,7 @@ export default function Wishlist() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
     paddingTop: 20,
     paddingBottom: 8,
     flexDirection: "row",
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: 14,
     paddingVertical: 14,
     borderRadius: 14,
     gap: 8,

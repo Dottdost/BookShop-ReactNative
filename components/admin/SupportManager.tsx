@@ -661,7 +661,7 @@ export default function SupportManager() {
                 s.headerBtn,
                 { backgroundColor: "rgba(248,113,113,0.12)" },
               ]}
-              onPress={() => setCloseModal(true)}
+              onPress={closeChatTicket}
             >
               <Ionicons name="close-circle-outline" size={22} color="#f87171" />
             </TouchableOpacity>
@@ -912,7 +912,7 @@ const s = StyleSheet.create({
   },
 
   takeBtn: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 12,
   },
@@ -987,7 +987,7 @@ const s = StyleSheet.create({
     alignItems: "flex-end",
     borderWidth: 1,
     borderRadius: 18,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     gap: 8,
   },

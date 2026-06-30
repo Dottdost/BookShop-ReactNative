@@ -3,6 +3,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Animated,
   Image,
@@ -13,37 +14,54 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useTranslation } from "react-i18next";
 import cartStorage from "../../hooks/cartStorage";
 
 const wishlistStorage = {
   _key: (): string => {
     if (Platform.OS !== "web") return "wishlist_guest";
+
     const userId = localStorage.getItem("userId") || "guest";
     return `wishlist_${userId}`;
   },
+
   get: (): string[] => {
     if (Platform.OS !== "web") return [];
+
     try {
       return JSON.parse(localStorage.getItem(wishlistStorage._key()) || "[]");
     } catch {
       return [];
     }
   },
+
   toggle: (id: string): boolean => {
     const list = wishlistStorage.get();
     const idx = list.indexOf(id);
+
     if (idx === -1) {
       list.push(id);
     } else {
       list.splice(idx, 1);
     }
-    if (Platform.OS === "web")
+
+    if (Platform.OS === "web") {
       localStorage.setItem(wishlistStorage._key(), JSON.stringify(list));
+    }
+
     return idx === -1;
   },
+
   isLiked: (id: string): boolean => wishlistStorage.get().includes(id),
 };
+
+function getParamId(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0] || "";
+  return value || "";
+}
+
+function unwrapBook(data: any) {
+  return data?.data ?? data?.book ?? data;
+}
 
 function SkeletonLoader() {
   const { theme } = useTheme();
@@ -72,18 +90,22 @@ function SkeletonLoader() {
   });
 
   return (
-    <View style={[styles.skeletonContainer, { backgroundColor: theme.bg }]}> 
+    <View style={[styles.skeletonContainer, { backgroundColor: theme.bg }]}>
       <Animated.View style={[styles.skeletonImage, { backgroundColor: bg }]} />
+
       <View style={styles.skeletonContent}>
         <Animated.View
           style={[styles.skeletonLine, { width: "70%", backgroundColor: bg }]}
         />
+
         <Animated.View
           style={[styles.skeletonLine, { width: "45%", backgroundColor: bg }]}
         />
+
         <Animated.View
           style={[styles.skeletonLine, { width: "30%", backgroundColor: bg }]}
         />
+
         <Animated.View
           style={[styles.skeletonBlock, { backgroundColor: bg }]}
         />
@@ -97,6 +119,9 @@ export default function BookDetails() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams();
   const router = useRouter();
+
+  const bookId = getParamId(id);
+
   const [book, setBook] = useState<any>(null);
   const [added, setAdded] = useState(false);
   const [liked, setLiked] = useState(false);
@@ -114,20 +139,43 @@ export default function BookDetails() {
       if (Platform.OS === "web") {
         setIsLoggedIn(!!localStorage.getItem("token"));
       }
-      setLiked(wishlistStorage.isLiked(String(id)));
-    }, [id]),
+
+      if (bookId) {
+        setLiked(wishlistStorage.isLiked(bookId));
+      }
+    }, [bookId]),
   );
 
   useEffect(() => {
-    loadBook();
-  }, []);
+    if (!bookId) return;
 
-  const loadBook = async () => {
+    void loadBook(bookId);
+  }, [bookId]);
+
+  const resetAnimation = () => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(40);
+    scaleImg.setValue(1.08);
+  };
+
+  const loadBook = async (currentBookId: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/books/${id}`);
+      setBook(null);
+      setAdded(false);
+      resetAnimation();
+
+      const res = await fetch(
+        `${API_URL}/api/books/${encodeURIComponent(currentBookId)}`,
+      );
+
       const data = await res.json();
-      setBook(data);
-      setLiked(wishlistStorage.isLiked(String(id)));
+      const loadedBook = unwrapBook(data);
+
+      setBook(loadedBook);
+      setLiked(
+        wishlistStorage.isLiked(String(loadedBook?.id ?? currentBookId)),
+      );
+
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -146,7 +194,7 @@ export default function BookDetails() {
         }),
       ]).start();
     } catch (err) {
-      console.log(err);
+      console.log("Book load error:", err);
     }
   };
 
@@ -163,22 +211,29 @@ export default function BookDetails() {
         useNativeDriver: false,
       }),
     ]).start();
+
     if (book) {
+      const currentBookId = String(book.id ?? bookId);
+
       cartStorage.add({
-        bookId: String(id),
+        bookId: currentBookId,
         title: book.title,
         author: book.author,
         imageUrl: book.imageUrl,
-        price: book.price,
+        price: Number(book.price ?? 0),
       });
     }
+
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
 
   const handleLike = () => {
-    const newVal = wishlistStorage.toggle(String(id));
+    const currentBookId = String(book?.id ?? bookId);
+
+    const newVal = wishlistStorage.toggle(currentBookId);
     setLiked(newVal);
+
     Animated.sequence([
       Animated.timing(heartScale, {
         toValue: 1.6,
@@ -216,12 +271,13 @@ export default function BookDetails() {
   if (!book) return <SkeletonLoader />;
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.bg }]}> 
+    <View style={[styles.root, { backgroundColor: theme.bg }]}>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <Animated.View
           style={[styles.imageWrapper, { transform: [{ scale: scaleImg }] }]}
         >
           <Image source={{ uri: book.imageUrl }} style={styles.image} />
+
           <View
             style={[
               styles.imageOverlay,
@@ -279,11 +335,13 @@ export default function BookDetails() {
                 ]}
               >
                 <Ionicons name="bookmark" size={11} color={theme.accent} />
-                <Text style={[styles.tagText, { color: theme.accent }]}> 
+
+                <Text style={[styles.tagText, { color: theme.accent }]}>
                   {book.genreName}
                 </Text>
               </View>
             )}
+
             <View
               style={[
                 styles.tag,
@@ -291,10 +349,12 @@ export default function BookDetails() {
               ]}
             >
               <Ionicons name="layers-outline" size={11} color={theme.accent} />
-              <Text style={[styles.tagText, { color: theme.accent }]}> 
+
+              <Text style={[styles.tagText, { color: theme.accent }]}>
                 {t("bookDetails.inStock", { count: book.stock })}
               </Text>
             </View>
+
             {book.publisherName && (
               <View
                 style={[
@@ -310,7 +370,8 @@ export default function BookDetails() {
                   size={11}
                   color={theme.accent}
                 />
-                <Text style={[styles.tagText, { color: theme.accent }]}> 
+
+                <Text style={[styles.tagText, { color: theme.accent }]}>
                   {book.publisherName}
                 </Text>
               </View>
@@ -320,7 +381,8 @@ export default function BookDetails() {
           <Text style={[styles.title, { color: theme.text }]}>
             {book.title}
           </Text>
-          <Text style={[styles.author, { color: theme.text2 }]}> 
+
+          <Text style={[styles.author, { color: theme.text2 }]}>
             {t("bookDetails.byAuthor", { author: book.author })}
           </Text>
 
@@ -334,11 +396,13 @@ export default function BookDetails() {
           >
             <View style={styles.descHeader}>
               <Ionicons name="reader-outline" size={16} color={theme.accent} />
-              <Text style={[styles.sectionLabel, { color: theme.accent }]}> 
+
+              <Text style={[styles.sectionLabel, { color: theme.accent }]}>
                 {t("bookDetails.description")}
               </Text>
             </View>
-            <Text style={[styles.description, { color: theme.text2 }]}> 
+
+            <Text style={[styles.description, { color: theme.text2 }]}>
               {book.description}
             </Text>
           </View>
@@ -351,25 +415,32 @@ export default function BookDetails() {
           >
             <View style={styles.detailRow}>
               <Ionicons name="person-outline" size={16} color={theme.text3} />
-              <Text style={[styles.detailLabel, { color: theme.text3 }]}> 
+
+              <Text style={[styles.detailLabel, { color: theme.text3 }]}>
                 {t("bookDetails.author")}
               </Text>
-              <Text style={[styles.detailValue, { color: theme.text }]}> 
+
+              <Text style={[styles.detailValue, { color: theme.text }]}>
                 {book.author}
               </Text>
             </View>
+
             <View
               style={[styles.detailDivider, { backgroundColor: theme.border }]}
             />
+
             <View style={styles.detailRow}>
               <Ionicons name="bookmark-outline" size={16} color={theme.text3} />
-              <Text style={[styles.detailLabel, { color: theme.text3 }]}> 
+
+              <Text style={[styles.detailLabel, { color: theme.text3 }]}>
                 {t("bookDetails.genre")}
               </Text>
-              <Text style={[styles.detailValue, { color: theme.text }]}> 
+
+              <Text style={[styles.detailValue, { color: theme.text }]}>
                 {book.genreName}
               </Text>
             </View>
+
             {book.publisherName && (
               <>
                 <View
@@ -378,30 +449,37 @@ export default function BookDetails() {
                     { backgroundColor: theme.border },
                   ]}
                 />
+
                 <View style={styles.detailRow}>
                   <Ionicons
                     name="business-outline"
                     size={16}
                     color={theme.text3}
                   />
-                  <Text style={[styles.detailLabel, { color: theme.text3 }]}> 
+
+                  <Text style={[styles.detailLabel, { color: theme.text3 }]}>
                     {t("bookDetails.publisher")}
                   </Text>
-                  <Text style={[styles.detailValue, { color: theme.text }]}> 
+
+                  <Text style={[styles.detailValue, { color: theme.text }]}>
                     {book.publisherName}
                   </Text>
                 </View>
               </>
             )}
+
             <View
               style={[styles.detailDivider, { backgroundColor: theme.border }]}
             />
+
             <View style={styles.detailRow}>
               <Ionicons name="cube-outline" size={16} color={theme.text3} />
-              <Text style={[styles.detailLabel, { color: theme.text3 }]}> 
+
+              <Text style={[styles.detailLabel, { color: theme.text3 }]}>
                 {t("bookDetails.stock")}
               </Text>
-              <Text style={[styles.detailValue, { color: theme.text }]}> 
+
+              <Text style={[styles.detailValue, { color: theme.text }]}>
                 {book.stock}
               </Text>
             </View>
@@ -416,34 +494,34 @@ export default function BookDetails() {
           styles.bottomBar,
           {
             backgroundColor: theme.bg2,
-            borderTopColor: theme.border,
+            borderColor: theme.border,
             transform: [{ scale: btnScale }],
           },
         ]}
       >
-        <View style={styles.priceRow}>
-          <Text style={[styles.priceLabel, { color: theme.text3 }]}> 
-            {t("bookDetails.price")}
-          </Text>
-          <Text style={[styles.price, { color: theme.accent }]}> 
-            ${book.price}
-          </Text>
-        </View>
+        <TouchableOpacity
+          style={[styles.backBtn, { backgroundColor: theme.accentBg }]}
+          onPress={() => router.replace("/books")}
+        >
+          <Ionicons name="chevron-back" size={22} color={theme.accent} />
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={[
-            styles.cartBtn,
-            { backgroundColor: added ? "#16a34a" : theme.accent },
+            styles.addBtn,
+            {
+              backgroundColor: added ? "#22c55e" : theme.accent,
+            },
           ]}
           onPress={handleAddToCart}
-          activeOpacity={0.85}
         >
           <Ionicons
-            name={added ? "checkmark-circle-outline" : "bag-add-outline"}
+            name={added ? "checkmark-circle-outline" : "cart-outline"}
             size={20}
             color="white"
           />
-          <Text style={styles.cartText}> 
+
+          <Text style={styles.addBtnText}>
             {added ? t("bookDetails.added") : t("bookDetails.addToCart")}
           </Text>
         </TouchableOpacity>
@@ -453,117 +531,211 @@ export default function BookDetails() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  scroll: { flex: 1 },
-  skeletonContainer: { flex: 1 },
-  skeletonImage: { width: "100%", height: 300 },
-  skeletonContent: { padding: 20, gap: 14 },
-  skeletonLine: { height: 16, borderRadius: 8 },
-  skeletonBlock: { height: 100, borderRadius: 12, marginTop: 10 },
-  imageWrapper: { width: "100%", height: 300, position: "relative" },
-  image: { width: "100%", height: "100%" },
-  imageOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 100,
+  root: {
+    flex: 1,
   },
+
+  scroll: {
+    flex: 1,
+  },
+
+  skeletonContainer: {
+    flex: 1,
+  },
+
+  skeletonImage: {
+    height: 360,
+  },
+
+  skeletonContent: {
+    padding: 22,
+  },
+
+  skeletonLine: {
+    height: 18,
+    borderRadius: 10,
+    marginBottom: 14,
+  },
+
+  skeletonBlock: {
+    height: 120,
+    borderRadius: 20,
+    marginTop: 12,
+  },
+
+  imageWrapper: {
+    height: 390,
+    overflow: "hidden",
+  },
+
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+
   priceBadge: {
     position: "absolute",
-    top: 16,
-    right: 16,
-    backgroundColor: "#7c3aed",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    right: 20,
+    bottom: 22,
+    backgroundColor: "#8b5cf6",
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 999,
   },
-  priceBadgeText: { color: "white", fontWeight: "700", fontSize: 15 },
+
+  priceBadgeText: {
+    color: "white",
+    fontWeight: "900",
+    fontSize: 18,
+  },
+
   likeBtn: {
     position: "absolute",
-    top: 16,
-    left: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
+    top: 48,
+    right: 20,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "rgba(0,0,0,0.45)",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
   },
-  content: { padding: 20 },
-  tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
+
+  content: {
+    padding: 22,
+  },
+
+  tagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 16,
+  },
+
   tag: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderRadius: 20,
+    gap: 5,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  tagText: { fontSize: 11 },
-  title: {
-    fontSize: 26,
-    fontWeight: "800",
-    letterSpacing: 0.3,
-    lineHeight: 32,
-    marginBottom: 6,
-  },
-  author: { fontSize: 15, marginBottom: 20 },
-  divider: { height: 1, marginBottom: 20 },
-  descCard: {
-    borderRadius: 16,
-    padding: 16,
+    paddingVertical: 6,
+    borderRadius: 999,
     borderWidth: 1,
-    marginBottom: 12,
   },
+
+  tagText: {
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  title: {
+    fontSize: 30,
+    fontWeight: "900",
+    lineHeight: 36,
+  },
+
+  author: {
+    fontSize: 16,
+    marginTop: 8,
+  },
+
+  divider: {
+    height: 1,
+    marginVertical: 22,
+  },
+
+  descCard: {
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 16,
+    marginBottom: 16,
+  },
+
   descHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 7,
     marginBottom: 10,
   },
-  sectionLabel: { fontSize: 14, fontWeight: "600" },
-  description: { fontSize: 14, lineHeight: 24 },
-  detailsCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: "hidden",
-    marginBottom: 12,
+
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
+
+  description: {
+    fontSize: 15,
+    lineHeight: 23,
+  },
+
+  detailsCard: {
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 16,
+  },
+
   detailRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 14,
-    gap: 10,
+    gap: 9,
+    paddingVertical: 7,
   },
-  detailLabel: { flex: 1, fontSize: 13 },
-  detailValue: { fontSize: 13, fontWeight: "600" },
-  detailDivider: { height: 1, marginHorizontal: 14 },
+
+  detailLabel: {
+    flex: 1,
+    fontSize: 13,
+  },
+
+  detailValue: {
+    fontSize: 13,
+    fontWeight: "800",
+    maxWidth: "55%",
+    textAlign: "right",
+  },
+
+  detailDivider: {
+    height: 1,
+    marginVertical: 4,
+  },
+
   bottomBar: {
     position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
+    left: 18,
+    right: 18,
+    bottom: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 12,
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingBottom: 28,
-    borderTopWidth: 1,
+    gap: 12,
   },
-  priceRow: { gap: 2 },
-  priceLabel: { fontSize: 12 },
-  price: { fontSize: 26, fontWeight: "800" },
-  cartBtn: {
-    flexDirection: "row",
+
+  backBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
     alignItems: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 16,
+    justifyContent: "center",
+  },
+
+  addBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
     gap: 8,
   },
-  cartText: { color: "white", fontSize: 15, fontWeight: "700" },
+
+  addBtnText: {
+    color: "white",
+    fontSize: 15,
+    fontWeight: "900",
+  },
 });

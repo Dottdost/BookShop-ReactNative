@@ -8,37 +8,37 @@ export default function Contacts() {
   const { t } = useTranslation();
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}> 
+    <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <View
         style={[
           styles.card,
           { backgroundColor: theme.bg2, borderColor: theme.border },
         ]}
       >
-        <View style={[styles.iconCircle, { backgroundColor: theme.accentBg }]}> 
+        <View style={[styles.iconCircle, { backgroundColor: theme.accentBg }]}>
           <Ionicons name="mail-outline" size={34} color={theme.accent} />
         </View>
-        <Text style={[styles.title, { color: theme.text }]}> 
+        <Text style={[styles.title, { color: theme.text }]}>
           {t("contactsScreen.title")}
         </Text>
-        <Text style={[styles.subtitle, { color: theme.text3 }]}> 
+        <Text style={[styles.subtitle, { color: theme.text3 }]}>
           {t("contactsScreen.subtitle")}
         </Text>
 
-        <View style={[styles.infoBox, { borderColor: theme.border }]}> 
-          <Text style={[styles.infoLabel, { color: theme.text3 }]}> 
+        <View style={[styles.infoBox, { borderColor: theme.border }]}>
+          <Text style={[styles.infoLabel, { color: theme.text3 }]}>
             {t("contactsScreen.email")}
           </Text>
-          <Text style={[styles.infoValue, { color: theme.text }]}> 
+          <Text style={[styles.infoValue, { color: theme.text }]}>
             support@cheshireshelf.com
           </Text>
         </View>
 
-        <View style={[styles.infoBox, { borderColor: theme.border }]}> 
-          <Text style={[styles.infoLabel, { color: theme.text3 }]}> 
+        <View style={[styles.infoBox, { borderColor: theme.border }]}>
+          <Text style={[styles.infoLabel, { color: theme.text3 }]}>
             {t("contactsScreen.phone")}
           </Text>
-          <Text style={[styles.infoValue, { color: theme.text }]}> 
+          <Text style={[styles.infoValue, { color: theme.text }]}>
             +994 00 000 00 00
           </Text>
         </View>

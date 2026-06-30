@@ -23,7 +23,11 @@ const TABS = [
   { key: "books", labelKey: "adminScreen.books", icon: "book-outline" },
   { key: "users", labelKey: "adminScreen.users", icon: "people-outline" },
   { key: "orders", labelKey: "adminScreen.orders", icon: "receipt-outline" },
-  { key: "support", labelKey: "adminScreen.support", icon: "chatbubbles-outline" },
+  {
+    key: "support",
+    labelKey: "adminScreen.support",
+    icon: "chatbubbles-outline",
+  },
   { key: "promos", labelKey: "adminScreen.promos", icon: "pricetag-outline" },
   { key: "genres", labelKey: "adminScreen.genres", icon: "bookmark-outline" },
 ];
@@ -60,7 +64,7 @@ export default function AdminPanel() {
       >
         <Ionicons name="lock-closed-outline" size={64} color={theme.text3} />
 
-        <Text style={[s.denied, { color: theme.text }]}> 
+        <Text style={[s.denied, { color: theme.text }]}>
           {t("adminScreen.accessDenied")}
         </Text>
 
@@ -84,14 +88,16 @@ export default function AdminPanel() {
     <Animated.View
       style={[s.container, { backgroundColor: theme.bg, opacity: fadeAnim }]}
     >
-      <View style={[s.header, { borderBottomColor: theme.border }]}> 
+      <View style={[s.header, { borderBottomColor: theme.border }]}>
         <View>
-          <Text style={[s.headerTitle, { color: theme.text }]}> 
+          <Text style={[s.headerTitle, { color: theme.text }]}>
             {t("adminScreen.adminPanel")}
           </Text>
 
-          <Text style={[s.headerRole, { color: theme.accent }]}> 
-            {isSuperAdmin ? t("adminScreen.superAdmin") : t("adminScreen.admin")}
+          <Text style={[s.headerRole, { color: theme.accent }]}>
+            {isSuperAdmin
+              ? t("adminScreen.superAdmin")
+              : t("adminScreen.admin")}
           </Text>
         </View>
 
@@ -116,7 +122,7 @@ export default function AdminPanel() {
         horizontal
         showsHorizontalScrollIndicator={false}
         style={[s.tabBar, { borderBottomColor: theme.border }]}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+        contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}
       >
         {TABS.map((tab) => {
           const active = activeTab === tab.key;
@@ -174,7 +180,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
     paddingTop: 16,
     paddingBottom: 14,
     borderBottomWidth: 1,
@@ -224,7 +230,7 @@ const s = StyleSheet.create({
 
   backBtn: {
     marginTop: 24,
-    paddingHorizontal: 24,
+    paddingHorizontal: 14,
     paddingVertical: 14,
     borderRadius: 14,
   },

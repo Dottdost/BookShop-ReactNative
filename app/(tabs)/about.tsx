@@ -8,20 +8,20 @@ export default function About() {
   const { t } = useTranslation();
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}> 
+    <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <View
         style={[
           styles.card,
           { backgroundColor: theme.bg2, borderColor: theme.border },
         ]}
       >
-        <View style={[styles.iconCircle, { backgroundColor: theme.accentBg }]}> 
+        <View style={[styles.iconCircle, { backgroundColor: theme.accentBg }]}>
           <Ionicons name="book-outline" size={34} color={theme.accent} />
         </View>
-        <Text style={[styles.title, { color: theme.text }]}> 
+        <Text style={[styles.title, { color: theme.text }]}>
           {t("aboutScreen.title")}
         </Text>
-        <Text style={[styles.subtitle, { color: theme.text3 }]}> 
+        <Text style={[styles.subtitle, { color: theme.text3 }]}>
           {t("aboutScreen.subtitle")}
         </Text>
       </View>

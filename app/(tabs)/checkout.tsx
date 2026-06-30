@@ -183,9 +183,8 @@ function CardModal({
       Alert.alert(t("common.error"), "Expiration month is invalid.");
       return;
     }
-
-    if (cleanCvv.length < 4) {
-      Alert.alert(t("common.error"), "CVV must contain at least 4 digits.");
+    if (cleanCvv.length !== 3) {
+      Alert.alert(t("common.error"), "CVV must contain 3 digits.");
       return;
     }
 
@@ -360,11 +359,11 @@ function CardModal({
               placeholder="CVV"
               placeholderTextColor={theme.text3}
               value={cvv}
-              onChangeText={(v) => setCvv(v.replace(/\D/g, "").slice(0, 4))}
+              onChangeText={(v) => setCvv(v.replace(/\D/g, "").slice(0, 3))}
               style={[styles.input, { color: theme.text }]}
               keyboardType="numeric"
               secureTextEntry
-              maxLength={4}
+              maxLength={3}
             />
           </View>
         </View>
@@ -851,7 +850,7 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 28,
     fontWeight: "800",
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
     paddingTop: 24,
     paddingBottom: 8,
   },
@@ -919,7 +918,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 12,
+    minHeight: 56,
+    paddingHorizontal: 14,
   },
 
   inputIcon: {

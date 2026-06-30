@@ -397,7 +397,11 @@ export default function GenreManager() {
                 onChangeText={(value) =>
                   setForm((prev) => ({ ...prev, name: value }))
                 }
-                style={{ color: theme.text, flex: 1, paddingVertical: 10 }}
+                style={{
+                  color: theme.text,
+                  flex: 1,
+                  paddingVertical: 0,
+                }}
               />
             </View>
 
@@ -640,7 +644,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: 14,
     paddingVertical: 4,
     borderRadius: 10,
     borderWidth: 1,
@@ -664,7 +668,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
   },
   toggle: {
     flexDirection: "row",

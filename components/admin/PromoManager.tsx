@@ -14,6 +14,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import PaginationBar from "./PaginationBar";
+
+const PAGE_SIZE = 10;
 
 type Promo = {
   id?: string | number;
@@ -49,7 +52,16 @@ function unwrapPromos(data: any): Promo[] {
   if (Array.isArray(data?.$values)) return data.$values;
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.data?.$values)) return data.data.$values;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.items?.$values)) return data.items.$values;
+  if (Array.isArray(data?.data?.items)) return data.data.items;
+  if (Array.isArray(data?.data?.items?.$values)) return data.data.items.$values;
+
   return [];
+}
+
+function normalizeNumber(value: string) {
+  return value.trim().replace(",", ".");
 }
 
 export default function PromoManager() {
@@ -57,9 +69,11 @@ export default function PromoManager() {
   const { token: authToken } = useAuth();
 
   const token = useMemo(() => getWebToken() || authToken || null, [authToken]);
+
   const [promos, setPromos] = useState<Promo[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [page, setPage] = useState(1);
 
   const [form, setForm] = useState<PromoForm>({
     code: "",
@@ -85,6 +99,14 @@ export default function PromoManager() {
     message: "",
     onConfirm: null,
   });
+
+  const totalCount = promos.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedPromos = promos.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE,
+  );
 
   const showMessage = (
     title: string,
@@ -114,6 +136,7 @@ export default function PromoManager() {
       }
 
       setPromos(unwrapPromos(data));
+      setPage(1);
     } catch (e: any) {
       showMessage("Error", e?.message || "Error loading promo codes", "error");
     } finally {
@@ -122,7 +145,7 @@ export default function PromoManager() {
   };
 
   useEffect(() => {
-    load();
+    void load();
   }, [token]);
 
   const openCreate = () => {
@@ -132,7 +155,7 @@ export default function PromoManager() {
 
   const create = async () => {
     const code = form.code.trim().toUpperCase();
-    const discount = Number.parseFloat(form.discount);
+    const discount = Number.parseFloat(normalizeNumber(form.discount));
     const expiryDate = form.expiryDate.trim();
 
     if (!code || !form.discount.trim() || !expiryDate) {
@@ -207,6 +230,14 @@ export default function PromoManager() {
     }
   };
 
+  const refreshAfterDelete = async () => {
+    if (pagedPromos.length === 1 && page > 1) {
+      setPage((prev) => prev - 1);
+    }
+
+    await load();
+  };
+
   const del = (code: string) => {
     setConfirmModal({
       visible: true,
@@ -236,7 +267,7 @@ export default function PromoManager() {
           }
 
           showMessage("Deleted", "Promo code deleted successfully!");
-          await load();
+          await refreshAfterDelete();
         } catch (e: any) {
           showMessage(
             "Error",
@@ -253,94 +284,123 @@ export default function PromoManager() {
       <View style={s.row}>
         <Text style={[s.title, { color: theme.text }]}>Promo Codes</Text>
 
-        <TouchableOpacity
-          style={[s.addBtn, { backgroundColor: theme.accent }]}
-          onPress={openCreate}
-        >
-          <Ionicons name="add" size={18} color="white" />
-          <Text style={s.addBtnText}>New</Text>
-        </TouchableOpacity>
+        <View style={s.headerRight}>
+          <View style={[s.badge, { backgroundColor: theme.accentBg }]}>
+            <Text style={[s.badgeText, { color: theme.accent }]}>
+              {totalCount}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[s.addBtn, { backgroundColor: theme.accent }]}
+            onPress={openCreate}
+          >
+            <Ionicons name="add" size={18} color="white" />
+            <Text style={s.addBtnText}>New</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
         <ActivityIndicator color={theme.accent} style={{ marginTop: 20 }} />
       ) : (
-        <FlatList
-          data={promos}
-          keyExtractor={(item, index) => String(item.id ?? item.code ?? index)}
-          contentContainerStyle={{ paddingBottom: 40 }}
-          renderItem={({ item }) => (
-            <View
-              style={[
-                s.card,
-                { backgroundColor: theme.bg2, borderColor: theme.border },
-              ]}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={[s.cardTitle, { color: theme.text }]}>
-                  {item.code}
-                </Text>
-
-                <Text style={[s.cardSub, { color: theme.text2 }]}>
-                  {item.discount}% · Expires{" "}
-                  {item.expiryDate
-                    ? new Date(item.expiryDate).toLocaleDateString()
-                    : "—"}
-                </Text>
-
-                <View
-                  style={[
-                    s.pill,
-                    {
-                      backgroundColor: item.isActive
-                        ? "rgba(34,197,94,0.12)"
-                        : "rgba(248,113,113,0.12)",
-                    },
-                  ]}
-                >
-                  <Text
-                    style={{
-                      color: item.isActive ? "#22c55e" : "#f87171",
-                      fontSize: 11,
-                    }}
-                  >
-                    {item.isActive ? "Active" : "Inactive"}
+        <>
+          <FlatList
+            data={pagedPromos}
+            keyExtractor={(item, index) =>
+              String(item.id ?? item.code ?? index)
+            }
+            contentContainerStyle={{ paddingBottom: 10 }}
+            renderItem={({ item }) => (
+              <View
+                style={[
+                  s.card,
+                  { backgroundColor: theme.bg2, borderColor: theme.border },
+                ]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.cardTitle, { color: theme.text }]}>
+                    {item.code}
                   </Text>
+
+                  <Text style={[s.cardSub, { color: theme.text2 }]}>
+                    {item.discount}% · Expires{" "}
+                    {item.expiryDate
+                      ? new Date(item.expiryDate).toLocaleDateString()
+                      : "—"}
+                  </Text>
+
+                  <View
+                    style={[
+                      s.pill,
+                      {
+                        backgroundColor: item.isActive
+                          ? "rgba(34,197,94,0.12)"
+                          : "rgba(248,113,113,0.12)",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: item.isActive ? "#22c55e" : "#f87171",
+                        fontSize: 11,
+                        fontWeight: "700",
+                      }}
+                    >
+                      {item.isActive ? "Active" : "Inactive"}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={s.actions}>
+                  <TouchableOpacity
+                    style={[
+                      s.iconBtn,
+                      {
+                        backgroundColor: item.isActive
+                          ? "rgba(248,113,113,0.12)"
+                          : "rgba(34,197,94,0.12)",
+                      },
+                    ]}
+                    onPress={() => toggle(item.code, item.isActive)}
+                  >
+                    <Ionicons
+                      name={item.isActive ? "pause-outline" : "play-outline"}
+                      size={15}
+                      color={item.isActive ? "#f87171" : "#22c55e"}
+                    />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      s.iconBtn,
+                      { backgroundColor: "rgba(248,113,113,0.12)" },
+                    ]}
+                    onPress={() => del(item.code)}
+                  >
+                    <Ionicons name="trash-outline" size={15} color="#f87171" />
+                  </TouchableOpacity>
                 </View>
               </View>
+            )}
+          />
 
-              <View style={s.actions}>
-                <TouchableOpacity
-                  style={[
-                    s.iconBtn,
-                    {
-                      backgroundColor: item.isActive
-                        ? "rgba(248,113,113,0.12)"
-                        : "rgba(34,197,94,0.12)",
-                    },
-                  ]}
-                  onPress={() => toggle(item.code, item.isActive)}
-                >
-                  <Ionicons
-                    name={item.isActive ? "pause-outline" : "play-outline"}
-                    size={15}
-                    color={item.isActive ? "#f87171" : "#22c55e"}
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    s.iconBtn,
-                    { backgroundColor: "rgba(248,113,113,0.12)" },
-                  ]}
-                  onPress={() => del(item.code)}
-                >
-                  <Ionicons name="trash-outline" size={15} color="#f87171" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        />
+          <PaginationBar
+            page={safePage}
+            totalPages={totalPages}
+            totalCount={totalCount}
+            pageSize={PAGE_SIZE}
+            loading={loading}
+            accent={theme.accent}
+            accentBg={theme.accentBg}
+            bg={theme.bg}
+            bg2={theme.bg2}
+            border={theme.border}
+            text={theme.text}
+            text2={theme.text2}
+            onPageChange={setPage}
+          />
+        </>
       )}
 
       <Modal visible={showForm} transparent animationType="slide">
@@ -380,7 +440,11 @@ export default function PromoManager() {
                   onChangeText={(value) =>
                     setForm((prev) => ({ ...prev, [key]: value }))
                   }
-                  style={{ color: theme.text, flex: 1, paddingVertical: 10 }}
+                  style={{
+                    color: theme.text,
+                    flex: 1,
+                    paddingVertical: 0,
+                  }}
                   keyboardType={kb || "default"}
                   autoCapitalize={key === "code" ? "characters" : "none"}
                 />
@@ -392,7 +456,7 @@ export default function PromoManager() {
                 style={[s.btn, { backgroundColor: theme.bg3 }]}
                 onPress={() => setShowForm(false)}
               >
-                <Text style={{ color: theme.text2, fontWeight: "600" }}>
+                <Text style={{ color: theme.text2, fontWeight: "700" }}>
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -401,7 +465,7 @@ export default function PromoManager() {
                 style={[s.btn, { backgroundColor: theme.accent }]}
                 onPress={create}
               >
-                <Text style={{ color: "white", fontWeight: "700" }}>
+                <Text style={{ color: "white", fontWeight: "800" }}>
                   Create
                 </Text>
               </TouchableOpacity>
@@ -437,7 +501,7 @@ export default function PromoManager() {
                   setConfirmModal((prev) => ({ ...prev, visible: false }))
                 }
               >
-                <Text style={{ color: theme.text2, fontWeight: "600" }}>
+                <Text style={{ color: theme.text2, fontWeight: "700" }}>
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -446,7 +510,7 @@ export default function PromoManager() {
                 style={[s.btn, { backgroundColor: "#ef4444" }]}
                 onPress={() => confirmModal.onConfirm?.()}
               >
-                <Text style={{ color: "white", fontWeight: "700" }}>
+                <Text style={{ color: "white", fontWeight: "800" }}>
                   Delete
                 </Text>
               </TouchableOpacity>
@@ -499,7 +563,7 @@ export default function PromoManager() {
                 setMessageModal((prev) => ({ ...prev, visible: false }))
               }
             >
-              <Text style={{ color: "white", fontWeight: "700" }}>Okay</Text>
+              <Text style={{ color: "white", fontWeight: "800" }}>Okay</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -515,16 +579,44 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 16,
   },
-  title: { fontSize: 18, fontWeight: "700" },
+
+  title: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  badge: {
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+
+  badgeText: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 5,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingVertical: 9,
+    borderRadius: 14,
   },
-  addBtnText: { color: "white", fontWeight: "600", fontSize: 13 },
+
+  addBtnText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+
   card: {
     flexDirection: "row",
     alignItems: "center",
@@ -534,15 +626,30 @@ const s = StyleSheet.create({
     borderWidth: 1,
     gap: 10,
   },
-  cardTitle: { fontSize: 14, fontWeight: "600", marginBottom: 2 },
-  cardSub: { fontSize: 12, marginBottom: 4 },
+
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+
+  cardSub: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+
   pill: {
     alignSelf: "flex-start",
-    paddingHorizontal: 8,
+    paddingHorizontal: 14,
     paddingVertical: 2,
     borderRadius: 8,
   },
-  actions: { flexDirection: "row", gap: 6 },
+
+  actions: {
+    flexDirection: "row",
+    gap: 6,
+  },
+
   iconBtn: {
     width: 30,
     height: 30,
@@ -550,11 +657,13 @@ const s = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
   modalBg: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "flex-end",
   },
+
   sheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -563,15 +672,28 @@ const s = StyleSheet.create({
     borderBottomWidth: 0,
     gap: 10,
   },
-  sheetTitle: { fontSize: 18, fontWeight: "700", marginBottom: 4 },
+
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+
   input: {
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
   },
-  btns: { flexDirection: "row", gap: 10, marginTop: 10 },
+
+  btns: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+    width: "100%",
+  },
+
   btn: {
     flex: 1,
     alignItems: "center",
@@ -579,6 +701,7 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
   },
+
   centerModalBg: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.65)",
@@ -586,6 +709,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     padding: 24,
   },
+
   confirmBox: {
     width: "100%",
     maxWidth: 420,
@@ -594,6 +718,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
   },
+
   confirmIcon: {
     width: 64,
     height: 64,
@@ -602,6 +727,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     marginBottom: 14,
   },
+
   confirmIconDanger: {
     width: 64,
     height: 64,
@@ -611,18 +737,21 @@ const s = StyleSheet.create({
     alignItems: "center",
     marginBottom: 14,
   },
+
   confirmTitle: {
     fontSize: 20,
     fontWeight: "800",
     textAlign: "center",
     marginBottom: 8,
   },
+
   confirmMessage: {
     fontSize: 14,
     textAlign: "center",
     lineHeight: 20,
     marginBottom: 8,
   },
+
   fullBtn: {
     width: "100%",
     alignItems: "center",

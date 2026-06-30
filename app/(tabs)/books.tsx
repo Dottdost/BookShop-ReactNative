@@ -207,12 +207,15 @@ function BookCard({ item, isLoggedIn }: { item: Book; isLoggedIn: boolean }) {
           >
             {item.title}
           </Text>
-          <Text style={[styles.infoAuthor, { color: theme.text2 }]}> 
+          <Text style={[styles.infoAuthor, { color: theme.text2 }]}>
             {item.author}
           </Text>
           <View style={styles.genreRow}>
             <Ionicons name="bookmark-outline" size={11} color={theme.accent} />
-            <Text style={[styles.infoGenre, { color: theme.accent }]}> {item.genreName}</Text>
+            <Text style={[styles.infoGenre, { color: theme.accent }]}>
+              {" "}
+              {item.genreName}
+            </Text>
           </View>
           <TouchableOpacity
             style={[styles.cartBtn, { backgroundColor: theme.accent }]}
@@ -227,7 +230,7 @@ function BookCard({ item, isLoggedIn }: { item: Book; isLoggedIn: boolean }) {
         </Animated.View>
 
         {!flipped && (
-          <View style={[styles.staticInfo, { backgroundColor: theme.bg2 }]}> 
+          <View style={[styles.staticInfo, { backgroundColor: theme.bg2 }]}>
             <Text
               style={[styles.bookTitle, { color: theme.text }]}
               numberOfLines={1}
@@ -309,10 +312,13 @@ export default function Books() {
     setFiltered(result);
   }, [search, selectedGenre, books]);
 
-  const genresWithAll = [{ id: -1, name: t("booksScreen.allGenres") }, ...genres];
+  const genresWithAll = [
+    { id: -1, name: t("booksScreen.allGenres") },
+    ...genres,
+  ];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}> 
+    <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <View
         style={[
           styles.searchWrapper,
@@ -328,7 +334,7 @@ export default function Books() {
           style={[styles.searchInput, { color: theme.text }]}
         />
         {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch("")}> 
+          <TouchableOpacity onPress={() => setSearch("")}>
             <Ionicons name="close-outline" size={20} color={theme.text3} />
           </TouchableOpacity>
         )}
@@ -374,7 +380,7 @@ export default function Books() {
       />
 
       {!loading && !error && (
-        <Text style={[styles.countText, { color: theme.text3 }]}> 
+        <Text style={[styles.countText, { color: theme.text3 }]}>
           {t("booksScreen.booksFound", { count: filtered.length })}
         </Text>
       )}
@@ -382,7 +388,7 @@ export default function Books() {
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.accent} />
-          <Text style={[styles.loadingText, { color: theme.text3 }]}> 
+          <Text style={[styles.loadingText, { color: theme.text3 }]}>
             {t("booksScreen.loadingBooks")}
           </Text>
         </View>
@@ -390,14 +396,14 @@ export default function Books() {
         <View style={styles.center}>
           <Ionicons name="warning-outline" size={32} color="#f87171" />
           <Text style={[styles.errorText]}>{error}</Text>
-          <Text style={[styles.errorHint, { color: theme.text3 }]}> 
+          <Text style={[styles.errorHint, { color: theme.text3 }]}>
             {t("booksScreen.serverHint")}
           </Text>
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="book-outline" size={40} color={theme.text3} />
-          <Text style={[styles.emptyText, { color: theme.text3 }]}> 
+          <Text style={[styles.emptyText, { color: theme.text3 }]}>
             {t("booksScreen.empty")}
           </Text>
         </View>
@@ -419,7 +425,7 @@ export default function Books() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
+  container: { flex: 1, paddingHorizontal: 14, paddingTop: 16 },
   searchWrapper: {
     flexDirection: "row",
     alignItems: "center",
@@ -464,7 +470,7 @@ const styles = StyleSheet.create({
     right: 8,
     backgroundColor: "rgba(124,58,237,0.9)",
     borderRadius: 10,
-    paddingHorizontal: 8,
+    paddingHorizontal: 14,
     paddingVertical: 3,
   },
   priceText: { color: "white", fontSize: 11, fontWeight: "700" },
