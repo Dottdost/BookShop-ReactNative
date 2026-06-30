@@ -1,7 +1,8 @@
 import { useTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
-import { Link, useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Animated,
   FlatList,
@@ -12,7 +13,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useTranslation } from "react-i18next";
 import cartStorage, { CartItem } from "../hooks/cartStorage";
 
 function CartCard({
@@ -64,50 +64,58 @@ function CartCard({
         },
       ]}
     >
-      <Link href={`/book/${item.bookId}`}>
-        <TouchableOpacity style={styles.cardLeft} activeOpacity={0.85}>
-          <Image
-            source={{ uri: item.imageUrl }}
-            style={[styles.image, { backgroundColor: theme.bg3 }]}
-          />
-          <View style={styles.info}>
-            <Text
-              style={[styles.title, { color: theme.text }]}
-              numberOfLines={2}
-            >
-              {item.title}
-            </Text>
-            <Text style={[styles.author, { color: theme.text2 }]}>
-              {item.author}
-            </Text>
-            <Text style={[styles.unitPrice, { color: theme.text3 }]}>
-              ${item.price} {t("cartScreen.each")}
-            </Text>
-            <Text style={[styles.subtotal, { color: theme.accent }]}>
-              ${(item.price * item.quantity).toFixed(2)}
-            </Text>
-          </View>
-        </TouchableOpacity>
-      </Link>
+      <TouchableOpacity
+        style={styles.cardLeft}
+        activeOpacity={0.85}
+        onPress={() => router.push(`/book/${item.bookId}` as any)}
+      >
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={[styles.image, { backgroundColor: theme.bg3 }]}
+        />
+
+        <View style={styles.info}>
+          <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
+            {item.title}
+          </Text>
+
+          <Text style={[styles.author, { color: theme.text2 }]}>
+            {item.author}
+          </Text>
+
+          <Text style={[styles.unitPrice, { color: theme.text3 }]}>
+            ${item.price} {t("cartScreen.each")}
+          </Text>
+
+          <Text style={[styles.subtotal, { color: theme.accent }]}>
+            ${(item.price * item.quantity).toFixed(2)}
+          </Text>
+        </View>
+      </TouchableOpacity>
 
       <View style={styles.cardRight}>
         <TouchableOpacity style={styles.removeBtn} onPress={handleRemove}>
           <Ionicons name="trash-outline" size={18} color="#f87171" />
         </TouchableOpacity>
+
         <View style={styles.qtyRow}>
           <TouchableOpacity
             style={[styles.qtyBtn, { backgroundColor: theme.accentBg }]}
             onPress={() => {
-              if (item.quantity > 1)
+              if (item.quantity > 1) {
                 onQtyChange(item.bookId, item.quantity - 1);
-              else handleRemove();
+              } else {
+                handleRemove();
+              }
             }}
           >
             <Ionicons name="remove" size={16} color={theme.accent} />
           </TouchableOpacity>
+
           <Text style={[styles.qtyText, { color: theme.text }]}>
             {item.quantity}
           </Text>
+
           <TouchableOpacity
             style={[styles.qtyBtn, { backgroundColor: theme.accentBg }]}
             onPress={() => onQtyChange(item.bookId, item.quantity + 1)}
@@ -132,8 +140,10 @@ export default function Cart() {
     useCallback(() => {
       const loggedIn =
         Platform.OS === "web" ? !!localStorage.getItem("token") : false;
+
       setIsLoggedIn(loggedIn);
       setItems(cartStorage.get());
+
       Animated.timing(headerAnim, {
         toValue: 1,
         duration: 400,
@@ -146,6 +156,7 @@ export default function Cart() {
     cartStorage.remove(bookId);
     setItems(cartStorage.get());
   };
+
   const handleQtyChange = (bookId: string, qty: number) => {
     cartStorage.updateQty(bookId, qty);
     setItems(cartStorage.get());
@@ -167,6 +178,8 @@ export default function Cart() {
         useNativeDriver: false,
       }),
     ]).start();
+
+    router.push("/checkout");
   };
 
   if (!isLoggedIn) {
@@ -174,20 +187,23 @@ export default function Cart() {
       <View style={[styles.container, { backgroundColor: theme.bg }]}>
         <View style={styles.emptyCenter}>
           <Ionicons name="cart-outline" size={64} color={theme.text3} />
+
           <Text style={[styles.emptyTitle, { color: theme.text }]}>
             {t("cartScreen.signInTitle")}
           </Text>
+
           <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
             {t("cartScreen.signInSubtitle")}
           </Text>
-          <Link href="/sign-in">
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: theme.accent }]}
-            >
-              <Ionicons name="log-in-outline" size={18} color="white" />
-              <Text style={styles.actionBtnText}>{t("auth.signIn")}</Text>
-            </TouchableOpacity>
-          </Link>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: theme.accent }]}
+            onPress={() => router.push("/sign-in")}
+          >
+            <Ionicons name="log-in-outline" size={18} color="white" />
+
+            <Text style={styles.actionBtnText}>{t("auth.signIn")}</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -199,6 +215,7 @@ export default function Cart() {
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           {t("cartScreen.myCart")}
         </Text>
+
         <Text style={[styles.headerCount, { color: theme.accent }]}>
           {t("cartScreen.itemCount", { count: totalItems })}
         </Text>
@@ -207,22 +224,25 @@ export default function Cart() {
       {items.length === 0 ? (
         <View style={styles.emptyCenter}>
           <Ionicons name="cart-outline" size={64} color={theme.text3} />
+
           <Text style={[styles.emptyTitle, { color: theme.text }]}>
             {t("cartScreen.emptyTitle")}
           </Text>
+
           <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
             {t("cartScreen.emptySubtitle")}
           </Text>
-          <Link href="/books">
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: theme.accent }]}
-            >
-              <Ionicons name="book-outline" size={18} color="white" />
-              <Text style={styles.actionBtnText}>
-                {t("cartScreen.browseBooks")}
-              </Text>
-            </TouchableOpacity>
-          </Link>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: theme.accent }]}
+            onPress={() => router.push("/books")}
+          >
+            <Ionicons name="book-outline" size={18} color="white" />
+
+            <Text style={styles.actionBtnText}>
+              {t("cartScreen.browseBooks")}
+            </Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <>
@@ -239,6 +259,7 @@ export default function Cart() {
               />
             )}
           />
+
           <View
             style={[
               styles.bottomBar,
@@ -249,25 +270,23 @@ export default function Cart() {
               <Text style={[styles.totalLabel, { color: theme.text2 }]}>
                 {t("common.total")}
               </Text>
+
               <Text style={[styles.totalPrice, { color: theme.text }]}>
                 ${total.toFixed(2)}
               </Text>
             </View>
+
             <Animated.View style={{ transform: [{ scale: btnAnim }] }}>
-              <Link href="/checkout">
-                <TouchableOpacity
-                  style={[
-                    styles.checkoutBtn,
-                    { backgroundColor: theme.accent },
-                  ]}
-                  onPress={handleCheckout}
-                >
-                  <Ionicons name="bag-check-outline" size={20} color="white" />
-                  <Text style={styles.checkoutText}>
-                    {t("cartScreen.checkout")}
-                  </Text>
-                </TouchableOpacity>
-              </Link>
+              <TouchableOpacity
+                style={[styles.checkoutBtn, { backgroundColor: theme.accent }]}
+                onPress={handleCheckout}
+              >
+                <Ionicons name="bag-check-outline" size={20} color="white" />
+
+                <Text style={styles.checkoutText}>
+                  {t("cartScreen.checkout")}
+                </Text>
+              </TouchableOpacity>
             </Animated.View>
           </View>
         </>
@@ -278,16 +297,20 @@ export default function Cart() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
   header: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
+
   headerTitle: { fontSize: 24, fontWeight: "800" },
+
   headerCount: { fontSize: 14, fontWeight: "600" },
+
   card: {
     borderRadius: 18,
     marginBottom: 14,
@@ -295,19 +318,33 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     flexDirection: "row",
   },
-  cardLeft: { flex: 1, flexDirection: "row", padding: 12, gap: 12 },
+
+  cardLeft: {
+    flex: 1,
+    flexDirection: "row",
+    padding: 12,
+    gap: 12,
+  },
+
   image: { width: 75, height: 105, borderRadius: 12 },
+
   info: { flex: 1, justifyContent: "center", gap: 3 },
+
   title: { fontSize: 14, fontWeight: "700", lineHeight: 18 },
+
   author: { fontSize: 12 },
+
   unitPrice: { fontSize: 11, marginTop: 4 },
+
   subtotal: { fontSize: 16, fontWeight: "800" },
+
   cardRight: {
     paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     justifyContent: "space-between",
     alignItems: "center",
   },
+
   removeBtn: {
     width: 34,
     height: 34,
@@ -316,7 +353,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
   qtyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+
   qtyBtn: {
     width: 28,
     height: 28,
@@ -324,12 +363,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
   qtyText: {
     fontSize: 15,
     fontWeight: "700",
     minWidth: 20,
     textAlign: "center",
   },
+
   bottomBar: {
     position: "absolute",
     bottom: 0,
@@ -340,13 +381,17 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     gap: 14,
   },
+
   totalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
+
   totalLabel: { fontSize: 16 },
+
   totalPrice: { fontSize: 28, fontWeight: "800" },
+
   checkoutBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -355,7 +400,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 10,
   },
+
   checkoutText: { color: "white", fontSize: 16, fontWeight: "700" },
+
   emptyCenter: {
     flex: 1,
     justifyContent: "center",
@@ -363,17 +410,21 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 40,
   },
+
   emptyTitle: { fontSize: 20, fontWeight: "700", textAlign: "center" },
+
   emptySubtitle: { fontSize: 14, textAlign: "center", lineHeight: 20 },
+
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 16,
     paddingVertical: 14,
-    paddingHorizontal: 14,
+    paddingHorizontal: 20,
     gap: 8,
     marginTop: 8,
   },
+
   actionBtnText: { color: "white", fontWeight: "700", fontSize: 15 },
 });

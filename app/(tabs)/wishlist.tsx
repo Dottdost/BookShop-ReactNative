@@ -1,8 +1,9 @@
 import API_URL from "@/.expo/config/api";
 import { useTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
-import { Link, useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Animated,
@@ -14,32 +15,39 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useTranslation } from "react-i18next";
 
 const wishlistStorage = {
   _key: (): string => {
     if (Platform.OS !== "web") return "wishlist_guest";
+
     const userId = localStorage.getItem("userId") || "guest";
     return `wishlist_${userId}`;
   },
+
   get: (): string[] => {
     if (Platform.OS !== "web") return [];
+
     try {
       return JSON.parse(localStorage.getItem(wishlistStorage._key()) || "[]");
     } catch {
       return [];
     }
   },
+
   toggle: (id: string): boolean => {
     const list = wishlistStorage.get();
     const idx = list.indexOf(id);
+
     if (idx === -1) {
       list.push(id);
     } else {
       list.splice(idx, 1);
     }
-    if (Platform.OS === "web")
+
+    if (Platform.OS === "web") {
       localStorage.setItem(wishlistStorage._key(), JSON.stringify(list));
+    }
+
     return idx === -1;
   },
 };
@@ -51,6 +59,10 @@ interface Book {
   imageUrl: string;
   price: number;
   genreName: string;
+}
+
+function unwrapBook(data: any) {
+  return data?.data ?? data?.book ?? data;
 }
 
 function WishlistCard({
@@ -107,38 +119,39 @@ function WishlistCard({
         },
       ]}
     >
-      <Link href={`/book/${item.id}` as any}>
-        <TouchableOpacity style={styles.cardInner} activeOpacity={0.85}>
-          <Image
-            source={{ uri: item.imageUrl }}
-            style={[styles.image, { backgroundColor: theme.bg3 }]}
-          />
-          <View style={styles.info}>
-            <Text
-              style={[styles.title, { color: theme.text }]}
-              numberOfLines={2}
-            >
-              {item.title}
-            </Text>
-            <Text style={[styles.author, { color: theme.text2 }]}>
-              {item.author}
-            </Text>
-            <View style={styles.genreRow}>
-              <Ionicons
-                name="bookmark-outline"
-                size={11}
-                color={theme.accent}
-              />
-              <Text style={[styles.genre, { color: theme.accent }]}>
-                {item.genreName}
-              </Text>
-            </View>
-            <Text style={[styles.price, { color: theme.accent }]}>
-              ${item.price}
+      <TouchableOpacity
+        style={styles.cardInner}
+        activeOpacity={0.85}
+        onPress={() => router.push(`/book/${item.id}` as any)}
+      >
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={[styles.image, { backgroundColor: theme.bg3 }]}
+        />
+
+        <View style={styles.info}>
+          <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
+            {item.title}
+          </Text>
+
+          <Text style={[styles.author, { color: theme.text2 }]}>
+            {item.author}
+          </Text>
+
+          <View style={styles.genreRow}>
+            <Ionicons name="bookmark-outline" size={11} color={theme.accent} />
+
+            <Text style={[styles.genre, { color: theme.accent }]}>
+              {item.genreName}
             </Text>
           </View>
-        </TouchableOpacity>
-      </Link>
+
+          <Text style={[styles.price, { color: theme.accent }]}>
+            ${item.price}
+          </Text>
+        </View>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.removeBtn} onPress={handleRemove}>
         <Animated.View style={{ transform: [{ scale: heartScale }] }}>
           <Ionicons name="heart" size={22} color="#f43f5e" />
@@ -160,9 +173,15 @@ export default function Wishlist() {
     useCallback(() => {
       const loggedIn =
         Platform.OS === "web" ? !!localStorage.getItem("token") : false;
+
       setIsLoggedIn(loggedIn);
-      if (loggedIn) loadWishlist();
-      else setLoading(false);
+
+      if (loggedIn) {
+        void loadWishlist();
+      } else {
+        setLoading(false);
+      }
+
       Animated.timing(headerAnim, {
         toValue: 1,
         duration: 500,
@@ -173,22 +192,28 @@ export default function Wishlist() {
 
   const loadWishlist = async () => {
     setLoading(true);
+
     try {
       const ids = wishlistStorage.get();
+
       if (ids.length === 0) {
         setBooks([]);
         setLoading(false);
         return;
       }
+
       const results = await Promise.all(
         ids.map(async (id) => {
           const res = await fetch(`${API_URL}/api/books/${id}`);
-          return res.json();
+          const data = await res.json();
+
+          return unwrapBook(data);
         }),
       );
-      setBooks(results);
+
+      setBooks(results.filter(Boolean));
     } catch (e) {
-      console.log(e);
+      console.log("Wishlist load error:", e);
     } finally {
       setLoading(false);
     }
@@ -196,7 +221,7 @@ export default function Wishlist() {
 
   const handleRemove = (id: string) => {
     wishlistStorage.toggle(id);
-    setBooks((prev) => prev.filter((b) => b.id !== id));
+    setBooks((prev) => prev.filter((book) => book.id !== id));
   };
 
   if (!isLoggedIn) {
@@ -208,20 +233,23 @@ export default function Wishlist() {
             size={64}
             color={theme.text3}
           />
+
           <Text style={[styles.emptyTitle, { color: theme.text }]}>
             {t("wishlistScreen.signInTitle")}
           </Text>
+
           <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
             {t("wishlistScreen.signInSubtitle")}
           </Text>
-          <Link href="/sign-in">
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: theme.accent }]}
-            >
-              <Ionicons name="log-in-outline" size={18} color="white" />
-              <Text style={styles.actionBtnText}>{t("auth.signIn")}</Text>
-            </TouchableOpacity>
-          </Link>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: theme.accent }]}
+            onPress={() => router.push("/sign-in")}
+          >
+            <Ionicons name="log-in-outline" size={18} color="white" />
+
+            <Text style={styles.actionBtnText}>{t("auth.signIn")}</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -233,6 +261,7 @@ export default function Wishlist() {
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           {t("wishlistScreen.myWishlist")}
         </Text>
+
         <Text style={[styles.headerCount, { color: theme.accent }]}>
           {t("wishlistScreen.bookCount", { count: books.length })}
         </Text>
@@ -245,12 +274,23 @@ export default function Wishlist() {
       ) : books.length === 0 ? (
         <View style={styles.emptyCenter}>
           <Ionicons name="heart-outline" size={64} color={theme.text3} />
+
           <Text style={[styles.emptyTitle, { color: theme.text }]}>
             {t("wishlistScreen.emptyTitle")}
           </Text>
+
           <Text style={[styles.emptySubtitle, { color: theme.text3 }]}>
             {t("wishlistScreen.emptySubtitle")}
           </Text>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: theme.accent }]}
+            onPress={() => router.push("/books")}
+          >
+            <Ionicons name="book-outline" size={18} color="white" />
+
+            <Text style={styles.actionBtnText}>Browse books</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -269,6 +309,7 @@ export default function Wishlist() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
   header: {
     paddingHorizontal: 14,
     paddingTop: 20,
@@ -277,8 +318,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+
   headerTitle: { fontSize: 24, fontWeight: "800" },
+
   headerCount: { fontSize: 14, fontWeight: "600" },
+
   card: {
     borderRadius: 18,
     marginBottom: 14,
@@ -287,15 +331,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+
   cardInner: { flex: 1, flexDirection: "row", padding: 12, gap: 14 },
+
   image: { width: 80, height: 110, borderRadius: 12 },
+
   info: { flex: 1, justifyContent: "center", gap: 4 },
+
   title: { fontSize: 15, fontWeight: "700", lineHeight: 20 },
+
   author: { fontSize: 13 },
-  genreRow: { flexDirection: "row", alignItems: "center" },
+
+  genreRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+
   genre: { fontSize: 11 },
+
   price: { fontSize: 18, fontWeight: "800", marginTop: 4 },
+
   removeBtn: { padding: 16, justifyContent: "center", alignItems: "center" },
+
   emptyCenter: {
     flex: 1,
     justifyContent: "center",
@@ -303,8 +357,11 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 40,
   },
+
   emptyTitle: { fontSize: 20, fontWeight: "700", textAlign: "center" },
+
   emptySubtitle: { fontSize: 14, textAlign: "center", lineHeight: 20 },
+
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -314,5 +371,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
+
   actionBtnText: { color: "white", fontWeight: "700", fontSize: 15 },
 });
