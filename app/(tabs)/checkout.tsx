@@ -1,14 +1,15 @@
+import { useAuth } from "@/app/hooks/useAuth";
 import { useTheme } from "@/context/ThemeContext";
 import API_URL from "@/services/config/api";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,7 +18,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import cartStorage from "../hooks/cartStorage";
+import cartStorage, { CartItem } from "../hooks/cartStorage";
 
 type CardForm = {
   cardNumber: string;
@@ -183,13 +184,13 @@ function CardModal({
       Alert.alert(t("common.error"), "Expiration month is invalid.");
       return;
     }
+
     if (cleanCvv.length !== 3) {
       Alert.alert(t("common.error"), "CVV must contain 3 digits.");
       return;
     }
 
     const fullYear = `20${shortYear}`;
-
     const expirationDate = `${fullYear}-${month.padStart(2, "0")}-01`;
 
     onConfirm({
@@ -253,6 +254,7 @@ function CardModal({
               size={28}
               color="rgba(255,255,255,0.6)"
             />
+
             <Text style={styles.cardChip}>VISA</Text>
           </View>
 
@@ -265,6 +267,7 @@ function CardModal({
               <Text style={styles.cardLabel}>
                 {t("checkoutScreen.cardHolder")}
               </Text>
+
               <Text style={styles.cardValue}>
                 {cardHolderName || t("checkoutScreen.yourName")}
               </Text>
@@ -274,6 +277,7 @@ function CardModal({
               <Text style={styles.cardLabel}>
                 {t("checkoutScreen.expires")}
               </Text>
+
               <Text style={styles.cardValue}>{expDate || "MM/YY"}</Text>
             </View>
           </View>
@@ -393,6 +397,7 @@ function CardModal({
 export default function Checkout() {
   const { theme } = useTheme();
   const { t } = useTranslation();
+  const { token, userId, loading: authLoading } = useAuth();
 
   const [street, setStreet] = useState("");
   const [city, setCity] = useState("");
@@ -402,9 +407,32 @@ export default function Checkout() {
   const [promoCode, setPromoCode] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [loadingCart, setLoadingCart] = useState(true);
   const [showCardModal, setShowCardModal] = useState(false);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
   const btnScale = useRef(new Animated.Value(1)).current;
+
+  const loadCart = async () => {
+    if (!userId) {
+      setCartItems([]);
+      setLoadingCart(false);
+      return;
+    }
+
+    setLoadingCart(true);
+
+    const list = await cartStorage.getAsync(userId);
+
+    setCartItems(list);
+    setLoadingCart(false);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadCart();
+    }, [userId]),
+  );
 
   const pressAnim = () => {
     Animated.sequence([
@@ -421,22 +449,17 @@ export default function Checkout() {
     ]).start();
   };
 
-  const getToken = () => {
-    if (Platform.OS !== "web") return null;
-
-    return localStorage.getItem("accessToken") || localStorage.getItem("token");
-  };
-
-  const getUserId = () => {
-    if (Platform.OS !== "web") return null;
-
-    return localStorage.getItem("userId");
-  };
+  const getToken = () => token || null;
+  const getUserId = () => userId || null;
 
   const handlePlaceOrder = () => {
-    const items = cartStorage.get();
+    if (!token || !userId) {
+      Alert.alert(t("common.error"), t("checkoutScreen.notLoggedIn"));
+      router.push("/sign-in");
+      return;
+    }
 
-    if (!items.length) {
+    if (!cartItems.length) {
       Alert.alert(t("common.error"), "Cart is empty.");
       return;
     }
@@ -455,9 +478,9 @@ export default function Checkout() {
     setShowCardModal(true);
   };
 
-  async function createAddress(token: string, userId: string) {
+  async function createAddress(tokenValue: string, currentUserId: string) {
     const payload = {
-      userId,
+      userId: currentUserId,
       street: street.trim(),
       city: city.trim(),
       state: state.trim(),
@@ -465,59 +488,55 @@ export default function Checkout() {
       country: country.trim(),
     };
 
-    console.log("ADDRESS PAYLOAD:", payload);
-
     const res = await fetch(`${API_URL}/api/Adress`, {
       method: "POST",
-      headers: authH(token),
+      headers: authH(tokenValue),
       body: JSON.stringify(payload),
     });
 
     const { text, data } = await readResponse(res);
 
     if (!res.ok) {
-      console.log("ADDRESS CREATE FAILED RESPONSE:", text);
       throw new Error(cleanError(text, `Address failed. Status ${res.status}`));
     }
 
     const id = getEntityId(data);
 
     if (!id) {
-      console.log("ADDRESS RESPONSE WITHOUT ID:", data);
       throw new Error("Address was created, but id was not returned.");
     }
 
     return id;
   }
 
-  async function createCard(token: string, userId: string, card: CardForm) {
+  async function createCard(
+    tokenValue: string,
+    currentUserId: string,
+    card: CardForm,
+  ) {
     const payload = {
       cardNumber: card.cardNumber,
       cardHolderName: card.cardHolderName,
       expirationDate: card.expirationDate,
       cvv: card.cvv,
-      userId,
+      userId: currentUserId,
     };
-
-    console.log("CARD PAYLOAD:", payload);
 
     const res = await fetch(`${API_URL}/api/Card`, {
       method: "POST",
-      headers: authH(token),
+      headers: authH(tokenValue),
       body: JSON.stringify(payload),
     });
 
     const { text, data } = await readResponse(res);
 
     if (!res.ok) {
-      console.log("CARD CREATE FAILED RESPONSE:", text);
       throw new Error(cleanError(text, `Card failed. Status ${res.status}`));
     }
 
     const id = getEntityId(data);
 
     if (!id) {
-      console.log("CARD RESPONSE WITHOUT ID:", data);
       throw new Error("Card was created, but id was not returned.");
     }
 
@@ -525,10 +544,8 @@ export default function Checkout() {
   }
 
   function getOrderItems() {
-    const items = cartStorage.get();
-
-    const orderItems = items.map((item: any) => {
-      const bookId = item.bookId ?? item.id;
+    const orderItems = cartItems.map((item) => {
+      const bookId = item.bookId;
       const quantity = Number(item.quantity ?? 1);
 
       return {
@@ -542,7 +559,7 @@ export default function Checkout() {
     );
 
     if (invalid) {
-      console.log("INVALID CART ITEMS:", items);
+      console.log("INVALID CART ITEMS:", cartItems);
       throw new Error("Cart item has no bookId or quantity.");
     }
 
@@ -550,33 +567,30 @@ export default function Checkout() {
   }
 
   async function createOrder(
-    token: string,
-    userId: string,
+    tokenValue: string,
+    currentUserId: string,
     addressId: string,
     cardId: string,
   ) {
     const cleanPromo = promoCode.trim();
 
     const payload = {
-      userId,
+      userId: currentUserId,
       userAddressId: addressId,
       userBankCardId: cardId,
       promoCode: cleanPromo || null,
       orderItems: getOrderItems(),
     };
 
-    console.log("ORDER PAYLOAD:", payload);
-
     const res = await fetch(`${API_URL}/api/Order`, {
       method: "POST",
-      headers: authH(token),
+      headers: authH(tokenValue),
       body: JSON.stringify(payload),
     });
 
     const { text, data } = await readResponse(res);
 
     if (!res.ok) {
-      console.log("ORDER FAILED RESPONSE:", text);
       throw new Error(cleanError(text, `Order failed. Status ${res.status}`));
     }
 
@@ -587,20 +601,22 @@ export default function Checkout() {
     setLoading(true);
 
     try {
-      const userId = getUserId();
-      const token = getToken();
+      const currentUserId = getUserId();
+      const tokenValue = getToken();
 
-      if (!userId || !token) {
+      if (!currentUserId || !tokenValue) {
         Alert.alert(t("common.error"), t("checkoutScreen.notLoggedIn"));
         return;
       }
 
-      const addressId = await createAddress(token, userId);
-      const cardId = await createCard(token, userId, card);
+      const addressId = await createAddress(tokenValue, currentUserId);
+      const cardId = await createCard(tokenValue, currentUserId, card);
 
-      await createOrder(token, userId, addressId, cardId);
+      await createOrder(tokenValue, currentUserId, addressId, cardId);
 
-      cartStorage.clear();
+      await cartStorage.clearAsync(currentUserId);
+      await loadCart();
+
       setShowCardModal(false);
 
       Alert.alert(
@@ -623,10 +639,10 @@ export default function Checkout() {
     }
   };
 
-  const items = cartStorage.get();
+  const items = cartItems;
+
   const total = items.reduce(
-    (sum: number, item: any) =>
-      sum + Number(item.price ?? 0) * Number(item.quantity ?? 1),
+    (sum, item) => sum + Number(item.price ?? 0) * Number(item.quantity ?? 1),
     0,
   );
 
@@ -663,6 +679,14 @@ export default function Checkout() {
     },
   ];
 
+  if (authLoading || loadingCart) {
+    return (
+      <View style={[styles.loaderRoot, { backgroundColor: theme.bg }]}>
+        <ActivityIndicator size="large" color={theme.accent} />
+      </View>
+    );
+  }
+
   return (
     <>
       <ScrollView
@@ -690,11 +714,8 @@ export default function Checkout() {
           {items.length === 0 ? (
             <Text style={{ color: theme.text3 }}>Cart is empty.</Text>
           ) : (
-            items.map((item: any, index: number) => (
-              <View
-                key={item.bookId ?? item.id ?? index}
-                style={styles.summaryRow}
-              >
+            items.map((item, index) => (
+              <View key={item.bookId ?? index} style={styles.summaryRow}>
                 <Text
                   style={[styles.summaryTitle, { color: theme.text }]}
                   numberOfLines={1}
@@ -843,6 +864,12 @@ export default function Checkout() {
 }
 
 const styles = StyleSheet.create({
+  loaderRoot: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
   container: {
     flex: 1,
   },

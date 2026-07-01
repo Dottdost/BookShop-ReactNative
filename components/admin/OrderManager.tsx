@@ -168,7 +168,6 @@ function getStatusNumber(status: number | string | undefined): number {
 
     if (byLabel) return Number(byLabel[0]);
 
-    // на всякий случай, если backend где-то вернёт британское написание
     if (normalized === "cancelled") return 4;
 
     const numeric = Number(status);
@@ -202,7 +201,7 @@ function formatDate(value?: string) {
 
 export default function OrderManager() {
   const { theme } = useTheme();
-  const { token: authToken } = useAuth();
+  const { token: authToken, loading: authLoading } = useAuth();
 
   const token = useMemo(() => {
     return getWebToken() || authToken || null;
@@ -253,16 +252,14 @@ export default function OrderManager() {
   };
 
   const load = async (currentPage = page) => {
+    if (authLoading) {
+      return;
+    }
+
     try {
       setLoading(true);
 
       if (!token) {
-        showMessage(
-          "Unauthorized",
-          "Token not found. Please log in again as SuperAdmin.",
-          "error",
-        );
-
         setOrders([]);
         setTotalCount(0);
         setTotalPages(1);
@@ -307,8 +304,13 @@ export default function OrderManager() {
   };
 
   useEffect(() => {
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
     void load(page);
-  }, [token, page]);
+  }, [authLoading, token, page]);
 
   const openStatusModal = (order: Order) => {
     setStatusModal({
@@ -348,7 +350,7 @@ export default function OrderManager() {
   };
 
   const changeStatus = async (status: number) => {
-    if (!statusModal.order?.id) return;
+    if (!statusModal.order?.id || !token) return;
 
     try {
       const res = await fetch(
@@ -386,7 +388,7 @@ export default function OrderManager() {
   };
 
   const deleteOrder = async () => {
-    if (!deleteModal.order?.id) return;
+    if (!deleteModal.order?.id || !token) return;
 
     try {
       const res = await fetch(
@@ -439,6 +441,18 @@ export default function OrderManager() {
 
       {loading ? (
         <ActivityIndicator color={theme.accent} style={{ marginTop: 20 }} />
+      ) : !token ? (
+        <View style={s.emptyBox}>
+          <Ionicons name="lock-closed-outline" size={40} color={theme.text3} />
+
+          <Text style={[s.emptyTitle, { color: theme.text }]}>
+            Please sign in again
+          </Text>
+
+          <Text style={[s.emptyText, { color: theme.text3 }]}>
+            Admin token was not found.
+          </Text>
+        </View>
       ) : (
         <>
           <FlatList
@@ -742,6 +756,24 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 4,
     borderRadius: 12,
+  },
+
+  emptyBox: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    padding: 24,
+  },
+
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+
+  emptyText: {
+    fontSize: 13,
+    textAlign: "center",
   },
 
   card: {

@@ -1,13 +1,14 @@
+import { useAuth } from "@/app/hooks/useAuth";
 import { useTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ActivityIndicator,
   Animated,
   FlatList,
   Image,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -26,6 +27,7 @@ function CartCard({
 }) {
   const { theme } = useTheme();
   const { t } = useTranslation();
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(24)).current;
 
@@ -70,7 +72,11 @@ function CartCard({
         onPress={() => router.push(`/book/${item.bookId}` as any)}
       >
         <Image
-          source={{ uri: item.imageUrl }}
+          source={{
+            uri:
+              item.imageUrl ||
+              "https://placehold.co/160x220/241633/d8b4fe?text=Book",
+          }}
           style={[styles.image, { backgroundColor: theme.bg3 }]}
         />
 
@@ -131,39 +137,56 @@ function CartCard({
 export default function Cart() {
   const { theme } = useTheme();
   const { t } = useTranslation();
+  const { token, userId, loading: authLoading } = useAuth();
+
   const [items, setItems] = useState<CartItem[]>([]);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loadingCart, setLoadingCart] = useState(true);
+
   const headerAnim = useRef(new Animated.Value(0)).current;
   const btnAnim = useRef(new Animated.Value(1)).current;
 
+  const isLoggedIn = !!token && !!userId;
+
+  const refreshCart = async () => {
+    if (!userId) {
+      setItems([]);
+      setLoadingCart(false);
+      return;
+    }
+
+    setLoadingCart(true);
+    const list = await cartStorage.getAsync(userId);
+    setItems(list);
+    setLoadingCart(false);
+  };
+
   useFocusEffect(
     useCallback(() => {
-      const loggedIn =
-        Platform.OS === "web" ? !!localStorage.getItem("token") : false;
-
-      setIsLoggedIn(loggedIn);
-      setItems(cartStorage.get());
+      void refreshCart();
 
       Animated.timing(headerAnim, {
         toValue: 1,
         duration: 400,
         useNativeDriver: false,
       }).start();
-    }, []),
+    }, [userId]),
   );
 
-  const handleRemove = (bookId: string) => {
-    cartStorage.remove(bookId);
-    setItems(cartStorage.get());
+  const handleRemove = async (bookId: string) => {
+    await cartStorage.removeAsync(bookId, userId);
+    await refreshCart();
   };
 
-  const handleQtyChange = (bookId: string, qty: number) => {
-    cartStorage.updateQty(bookId, qty);
-    setItems(cartStorage.get());
+  const handleQtyChange = async (bookId: string, qty: number) => {
+    await cartStorage.updateQtyAsync(bookId, qty, userId);
+    await refreshCart();
   };
 
-  const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const totalItems = items.reduce((s, i) => s + i.quantity, 0);
+  const total = items.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0,
+  );
+  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleCheckout = () => {
     Animated.sequence([
@@ -181,6 +204,16 @@ export default function Cart() {
 
     router.push("/checkout");
   };
+
+  if (authLoading || loadingCart) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.bg }]}>
+        <View style={styles.emptyCenter}>
+          <ActivityIndicator size="large" color={theme.accent} />
+        </View>
+      </View>
+    );
+  }
 
   if (!isLoggedIn) {
     return (
@@ -201,7 +234,6 @@ export default function Cart() {
             onPress={() => router.push("/sign-in")}
           >
             <Ionicons name="log-in-outline" size={18} color="white" />
-
             <Text style={styles.actionBtnText}>{t("auth.signIn")}</Text>
           </TouchableOpacity>
         </View>

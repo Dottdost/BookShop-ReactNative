@@ -47,6 +47,46 @@ function authH(token: string | null) {
   };
 }
 
+async function readResponse(res: Response) {
+  const text = await res.text();
+
+  if (!text) {
+    return {
+      text: "",
+      data: null,
+    };
+  }
+
+  try {
+    return {
+      text,
+      data: JSON.parse(text),
+    };
+  } catch {
+    return {
+      text,
+      data: null,
+    };
+  }
+}
+
+function cleanError(text: string, fallback: string) {
+  if (!text) return fallback;
+
+  try {
+    const json = JSON.parse(text);
+
+    if (json.errors) {
+      const messages = Object.values(json.errors).flat().join("\n");
+      return messages || json.title || fallback;
+    }
+
+    return json.title || json.message || text || fallback;
+  } catch {
+    return text || fallback;
+  }
+}
+
 function unwrapPromos(data: any): Promo[] {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.$values)) return data.$values;
@@ -66,7 +106,7 @@ function normalizeNumber(value: string) {
 
 export default function PromoManager() {
   const { theme } = useTheme();
-  const { token: authToken } = useAuth();
+  const { token: authToken, loading: authLoading } = useAuth();
 
   const token = useMemo(() => getWebToken() || authToken || null, [authToken]);
 
@@ -117,6 +157,17 @@ export default function PromoManager() {
   };
 
   const load = async () => {
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
+    if (!token) {
+      setPromos([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -124,14 +175,15 @@ export default function PromoManager() {
         headers: authH(token),
       });
 
-      const data = await res.json();
+      const { text, data } = await readResponse(res);
 
       if (!res.ok) {
         showMessage(
           "Error loading promo codes",
-          data?.message || `Status ${res.status}`,
+          cleanError(text, `Status ${res.status}`),
           "error",
         );
+        setPromos([]);
         return;
       }
 
@@ -146,7 +198,7 @@ export default function PromoManager() {
 
   useEffect(() => {
     void load();
-  }, [token]);
+  }, [token, authLoading]);
 
   const openCreate = () => {
     setForm({ code: "", discount: "", expiryDate: "" });
@@ -173,6 +225,11 @@ export default function PromoManager() {
       return;
     }
 
+    if (!token) {
+      showMessage("Unauthorized", "Please sign in again.", "error");
+      return;
+    }
+
     try {
       const res = await fetch(`${API_URL}/api/v1/PromoCode/Create`, {
         method: "POST",
@@ -184,10 +241,14 @@ export default function PromoManager() {
         }),
       });
 
-      const text = await res.text();
+      const { text } = await readResponse(res);
 
       if (!res.ok) {
-        showMessage("Create failed", text || `Status ${res.status}`, "error");
+        showMessage(
+          "Create failed",
+          cleanError(text, `Status ${res.status}`),
+          "error",
+        );
         return;
       }
 
@@ -201,6 +262,11 @@ export default function PromoManager() {
   };
 
   const toggle = async (code: string, isActive: boolean) => {
+    if (!token) {
+      showMessage("Unauthorized", "Please sign in again.", "error");
+      return;
+    }
+
     try {
       const action = isActive ? "Deactivate" : "Activate";
 
@@ -212,10 +278,14 @@ export default function PromoManager() {
         },
       );
 
-      const text = await res.text();
+      const { text } = await readResponse(res);
 
       if (!res.ok) {
-        showMessage("Action failed", text || `Status ${res.status}`, "error");
+        showMessage(
+          "Action failed",
+          cleanError(text, `Status ${res.status}`),
+          "error",
+        );
         return;
       }
 
@@ -246,6 +316,11 @@ export default function PromoManager() {
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, visible: false }));
 
+        if (!token) {
+          showMessage("Unauthorized", "Please sign in again.", "error");
+          return;
+        }
+
         try {
           const res = await fetch(
             `${API_URL}/api/v1/PromoCode/Delete?code=${encodeURIComponent(code)}`,
@@ -255,12 +330,12 @@ export default function PromoManager() {
             },
           );
 
-          const text = await res.text();
+          const { text } = await readResponse(res);
 
           if (!res.ok) {
             showMessage(
               "Delete failed",
-              text || `Status ${res.status}`,
+              cleanError(text, `Status ${res.status}`),
               "error",
             );
             return;
@@ -303,6 +378,13 @@ export default function PromoManager() {
 
       {loading ? (
         <ActivityIndicator color={theme.accent} style={{ marginTop: 20 }} />
+      ) : !token ? (
+        <View style={s.emptyBox}>
+          <Ionicons name="lock-closed-outline" size={38} color={theme.text3} />
+          <Text style={[s.emptyTitle, { color: theme.text }]}>
+            Please sign in again
+          </Text>
+        </View>
       ) : (
         <>
           <FlatList
@@ -443,7 +525,7 @@ export default function PromoManager() {
                   style={{
                     color: theme.text,
                     flex: 1,
-                    paddingVertical: 0,
+                    paddingVertical: 10,
                   }}
                   keyboardType={kb || "default"}
                   autoCapitalize={key === "code" ? "characters" : "none"}
@@ -617,6 +699,19 @@ const s = StyleSheet.create({
     fontSize: 13,
   },
 
+  emptyBox: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    padding: 24,
+  },
+
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+  },
+
   card: {
     flexDirection: "row",
     alignItems: "center",
@@ -685,6 +780,7 @@ const s = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 14,
+    minHeight: 52,
   },
 
   btns: {

@@ -12,8 +12,8 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ActivityIndicator,
   Animated,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -33,7 +33,7 @@ const TABS = [
 export default function AdminPanel() {
   const { theme } = useTheme();
   const { t } = useTranslation();
-  const { isAdmin, isSuperAdmin } = useAuth();
+  const { isAdmin, isSuperAdmin, loading } = useAuth();
 
   const [activeTab, setActiveTab] = useState("books");
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -50,16 +50,17 @@ export default function AdminPanel() {
     }, []),
   );
 
+  if (loading) {
+    return (
+      <View style={[s.deniedContainer, { backgroundColor: theme.bg }]}>
+        <ActivityIndicator size="large" color={theme.accent} />
+      </View>
+    );
+  }
+
   if (!isAdmin) {
     return (
-      <View
-        style={[
-          s.deniedContainer,
-          {
-            backgroundColor: theme.bg,
-          },
-        ]}
-      >
+      <View style={[s.deniedContainer, { backgroundColor: theme.bg }]}>
         <Ionicons name="lock-closed-outline" size={64} color={theme.text3} />
 
         <Text style={[s.denied, { color: theme.text }]}>
@@ -121,11 +122,7 @@ export default function AdminPanel() {
       </View>
 
       <View style={[s.tabsWrapper, { borderBottomColor: theme.border }]}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.tabsContent}
-        >
+        <View style={s.tabsGrid}>
           {TABS.map((tab) => {
             const active = activeTab === tab.key;
 
@@ -156,13 +153,14 @@ export default function AdminPanel() {
                       fontWeight: active ? "800" : "500",
                     },
                   ]}
+                  numberOfLines={1}
                 >
                   {tab.label}
                 </Text>
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
       </View>
 
       <View style={s.content}>
@@ -247,28 +245,33 @@ const s = StyleSheet.create({
   },
 
   tabsWrapper: {
-    flexGrow: 0,
     borderBottomWidth: 1,
+    paddingHorizontal: 14,
     paddingVertical: 12,
   },
 
-  tabsContent: {
-    paddingHorizontal: 14,
+  tabsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
 
   tab: {
+    width: "31.5%",
+    minHeight: 40,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
   },
 
   tabText: {
-    fontSize: 13,
+    fontSize: 12,
+    maxWidth: 78,
   },
 
   content: {

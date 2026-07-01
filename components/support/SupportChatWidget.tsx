@@ -8,7 +8,7 @@ import {
   onReceiveMessage,
 } from "@/services/signalr";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -105,7 +105,7 @@ function cleanError(text: string, fallback: string) {
 
   try {
     const json = JSON.parse(text);
-    return json.title || json.message || fallback;
+    return json.title || json.message || text || fallback;
   } catch {
     return text || fallback;
   }
@@ -116,14 +116,11 @@ function pickActiveUserChat(data: any): Chat | null {
 
   if (chats.length === 0) return null;
 
-  const waitingChats = chats.filter((chat) => {
-    const status = Number(chat?.status);
-    return !isClosedChat(chat) && status === 1;
-  });
+  const activeChats = chats.filter((chat) => !isClosedChat(chat));
 
-  if (waitingChats.length === 0) return null;
+  if (activeChats.length === 0) return null;
 
-  return waitingChats.sort(
+  return activeChats.sort(
     (a, b) =>
       new Date(b.createdAt ?? 0).getTime() -
       new Date(a.createdAt ?? 0).getTime(),
@@ -132,7 +129,13 @@ function pickActiveUserChat(data: any): Chat | null {
 
 export default function SupportChatWidget() {
   const { theme } = useTheme();
-  const { token, userId, isAdmin, isSuperAdmin } = useAuth();
+  const {
+    token,
+    userId,
+    isAdmin,
+    isSuperAdmin,
+    loading: authLoading,
+  } = useAuth();
 
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -147,12 +150,6 @@ export default function SupportChatWidget() {
   const listRef = useRef<FlatList<Message>>(null);
 
   const chatId = getChatId(chat);
-  const isLoggedIn = !!token;
-
-  const bubbleText = useMemo(() => {
-    if (!isLoggedIn) return "Sign in to chat";
-    return "Need help?";
-  }, [isLoggedIn]);
 
   useEffect(() => {
     Animated.loop(
@@ -195,18 +192,15 @@ export default function SupportChatWidget() {
         await onReceiveMessage(() => {
           loadMessages(chatId, false);
         });
-
-        console.log("SignalR joined chat:", chatId);
       } catch (e) {
         console.log("SignalR chat connection failed:", e);
       }
     }
 
-    connectSignalR();
+    void connectSignalR();
 
     return () => {
       mounted = false;
-
       offReceiveMessage().catch(() => {});
       leaveChatGroup(chatId).catch(() => {});
     };
@@ -220,7 +214,7 @@ export default function SupportChatWidget() {
     }
   }, [messages.length]);
 
-  if (isAdmin || isSuperAdmin) {
+  if (authLoading || isAdmin || isSuperAdmin) {
     return null;
   }
 
@@ -247,7 +241,7 @@ export default function SupportChatWidget() {
   }
 
   async function createChat(): Promise<Chat> {
-    if (!token) throw new Error("Token not found.");
+    if (!token) throw new Error("Please sign in to use support chat.");
 
     const res = await fetch(`${API_URL}/api/chat/create`, {
       method: "POST",
@@ -328,11 +322,6 @@ export default function SupportChatWidget() {
     setMessages([]);
     setInput("");
     setError("");
-  }
-
-  function hideWidget() {
-    setHidden(true);
-    setOpen(false);
   }
 
   async function sendMessage() {
@@ -456,36 +445,16 @@ export default function SupportChatWidget() {
             style={[
               styles.catBubble,
               {
-                backgroundColor: theme.bg2,
+                backgroundColor: theme.accent,
                 borderColor: theme.border,
               },
             ]}
           >
-            <View style={[styles.catFace, { backgroundColor: theme.accentBg }]}>
-              <Ionicons name="paw-outline" size={22} color={theme.accent} />
-            </View>
-
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.catTitle, { color: theme.text }]}>
-                Cheshire Support
-              </Text>
-
-              <Text style={[styles.catText, { color: theme.text2 }]}>
-                {bubbleText}
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              onPress={hideWidget}
-              hitSlop={10}
-              style={styles.hideBtn}
-            >
-              <Ionicons
-                name="chevron-forward-outline"
-                size={17}
-                color={theme.text3}
-              />
-            </TouchableOpacity>
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={25}
+              color="white"
+            />
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -665,59 +634,37 @@ export default function SupportChatWidget() {
 const styles = StyleSheet.create({
   floatingWrap: {
     position: "absolute",
-    right: -6,
-    bottom: 78,
-    zIndex: 999,
+    right: 14,
+    bottom: 24,
+    zIndex: 9999,
+    elevation: 9999,
   },
 
   hiddenButton: {
     position: "absolute",
     right: 14,
-    bottom: 84,
-    zIndex: 999,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    bottom: 24,
+    zIndex: 9999,
+    elevation: 9999,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
 
   catBubble: {
-    width: 236,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
+    width: 58,
+    height: 58,
     borderWidth: 1,
-    borderRadius: 22,
-    paddingLeft: 10,
-    paddingRight: 8,
-    paddingVertical: 9,
-  },
-
-  catFace: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  catTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-  },
-
-  catText: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-
-  hideBtn: {
-    width: 24,
-    height: 32,
+    borderRadius: 29,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
 
   modalBg: {

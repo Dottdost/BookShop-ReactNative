@@ -1,3 +1,5 @@
+import { useAuth } from "@/app/hooks/useAuth";
+import wishlistStorage from "@/app/hooks/wishlistStorage";
 import { useTheme } from "@/context/ThemeContext";
 import API_URL from "@/services/config/api";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,48 +11,11 @@ import {
   Animated,
   FlatList,
   Image,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-
-const wishlistStorage = {
-  _key: (): string => {
-    if (Platform.OS !== "web") return "wishlist_guest";
-
-    const userId = localStorage.getItem("userId") || "guest";
-    return `wishlist_${userId}`;
-  },
-
-  get: (): string[] => {
-    if (Platform.OS !== "web") return [];
-
-    try {
-      return JSON.parse(localStorage.getItem(wishlistStorage._key()) || "[]");
-    } catch {
-      return [];
-    }
-  },
-
-  toggle: (id: string): boolean => {
-    const list = wishlistStorage.get();
-    const idx = list.indexOf(id);
-
-    if (idx === -1) {
-      list.push(id);
-    } else {
-      list.splice(idx, 1);
-    }
-
-    if (Platform.OS === "web") {
-      localStorage.setItem(wishlistStorage._key(), JSON.stringify(list));
-    }
-
-    return idx === -1;
-  },
-};
 
 interface Book {
   id: string;
@@ -65,6 +30,17 @@ function unwrapBook(data: any) {
   return data?.data ?? data?.book ?? data;
 }
 
+function normalizeBook(item: any): Book {
+  return {
+    id: String(item.id ?? item.bookId ?? item.Id ?? item.BookId ?? ""),
+    title: String(item.title ?? item.Title ?? ""),
+    author: String(item.author ?? item.Author ?? ""),
+    imageUrl: String(item.imageUrl ?? item.ImageUrl ?? ""),
+    price: Number(item.price ?? item.Price ?? 0),
+    genreName: String(item.genreName ?? item.GenreName ?? ""),
+  };
+}
+
 function WishlistCard({
   item,
   onRemove,
@@ -73,6 +49,7 @@ function WishlistCard({
   onRemove: (id: string) => void;
 }) {
   const { theme } = useTheme();
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
@@ -125,7 +102,11 @@ function WishlistCard({
         onPress={() => router.push(`/book/${item.id}` as any)}
       >
         <Image
-          source={{ uri: item.imageUrl }}
+          source={{
+            uri:
+              item.imageUrl ||
+              "https://placehold.co/160x220/241633/d8b4fe?text=Book",
+          }}
           style={[styles.image, { backgroundColor: theme.bg3 }]}
         />
 
@@ -142,7 +123,7 @@ function WishlistCard({
             <Ionicons name="bookmark-outline" size={11} color={theme.accent} />
 
             <Text style={[styles.genre, { color: theme.accent }]}>
-              {item.genreName}
+              {item.genreName || "No genre"}
             </Text>
           </View>
 
@@ -164,41 +145,28 @@ function WishlistCard({
 export default function Wishlist() {
   const { theme } = useTheme();
   const { t } = useTranslation();
+  const { token, userId, loading: authLoading } = useAuth();
+
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const headerAnim = useRef(new Animated.Value(0)).current;
 
-  useFocusEffect(
-    useCallback(() => {
-      const loggedIn =
-        Platform.OS === "web" ? !!localStorage.getItem("token") : false;
-
-      setIsLoggedIn(loggedIn);
-
-      if (loggedIn) {
-        void loadWishlist();
-      } else {
-        setLoading(false);
-      }
-
-      Animated.timing(headerAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: false,
-      }).start();
-    }, []),
-  );
+  const isLoggedIn = !!token && !!userId;
 
   const loadWishlist = async () => {
+    if (!userId) {
+      setBooks([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const ids = wishlistStorage.get();
+      const ids = await wishlistStorage.getAsync(userId);
 
       if (ids.length === 0) {
         setBooks([]);
-        setLoading(false);
         return;
       }
 
@@ -207,22 +175,49 @@ export default function Wishlist() {
           const res = await fetch(`${API_URL}/api/books/${id}`);
           const data = await res.json();
 
-          return unwrapBook(data);
+          return normalizeBook(unwrapBook(data));
         }),
       );
 
-      setBooks(results.filter(Boolean));
-    } catch (e) {
-      console.log("Wishlist load error:", e);
+      setBooks(results.filter((book) => book.id));
+    } catch (error) {
+      console.log("Wishlist load error:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRemove = (id: string) => {
-    wishlistStorage.toggle(id);
+  useFocusEffect(
+    useCallback(() => {
+      if (isLoggedIn) {
+        void loadWishlist();
+      } else {
+        setBooks([]);
+        setLoading(false);
+      }
+
+      Animated.timing(headerAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }, [isLoggedIn, userId]),
+  );
+
+  const handleRemove = async (id: string) => {
+    await wishlistStorage.removeAsync(id, userId);
     setBooks((prev) => prev.filter((book) => book.id !== id));
   };
+
+  if (authLoading || loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.bg }]}>
+        <View style={styles.emptyCenter}>
+          <ActivityIndicator size="large" color={theme.accent} />
+        </View>
+      </View>
+    );
+  }
 
   if (!isLoggedIn) {
     return (
@@ -267,11 +262,7 @@ export default function Wishlist() {
         </Text>
       </Animated.View>
 
-      {loading ? (
-        <View style={styles.emptyCenter}>
-          <ActivityIndicator size="large" color={theme.accent} />
-        </View>
-      ) : books.length === 0 ? (
+      {books.length === 0 ? (
         <View style={styles.emptyCenter}>
           <Ionicons name="heart-outline" size={64} color={theme.text3} />
 
@@ -295,7 +286,7 @@ export default function Wishlist() {
       ) : (
         <FlatList
           data={books}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => item.id || String(index)}
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (

@@ -143,7 +143,7 @@ function cleanError(text: string, fallback: string) {
       return messages || json.title || fallback;
     }
 
-    return json.title || json.message || fallback;
+    return json.title || json.message || text || fallback;
   } catch {
     return text || fallback;
   }
@@ -151,7 +151,7 @@ function cleanError(text: string, fallback: string) {
 
 export default function SupportManager() {
   const { theme } = useTheme();
-  const { token, userId } = useAuth();
+  const { token, userId, loading: authLoading } = useAuth();
 
   const [waitingChats, setWaitingChats] = useState<Chat[]>([]);
   const [myChats, setMyChats] = useState<Chat[]>([]);
@@ -276,8 +276,12 @@ export default function SupportManager() {
   }
 
   async function loadAll() {
+    if (authLoading) return;
+
     if (!token) {
-      showMessage("Unauthorized", "Please sign in again.", "error");
+      setWaitingChats([]);
+      setMyChats([]);
+      setLoading(false);
       return;
     }
 
@@ -447,8 +451,13 @@ export default function SupportManager() {
   }
 
   useEffect(() => {
-    loadAll();
-  }, [token]);
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
+    void loadAll();
+  }, [token, authLoading]);
 
   useEffect(() => {
     const chatId = getChatId(activeChat);
@@ -503,6 +512,29 @@ export default function SupportManager() {
     );
   };
 
+  if (authLoading || loading) {
+    return (
+      <View style={s.center}>
+        <ActivityIndicator color={theme.accent} />
+        <Text style={{ color: theme.text3, marginTop: 10 }}>
+          Loading support chats...
+        </Text>
+      </View>
+    );
+  }
+
+  if (!token) {
+    return (
+      <View style={s.center}>
+        <Ionicons name="lock-closed-outline" size={38} color={theme.text3} />
+
+        <Text style={[s.emptyTitle, { color: theme.text }]}>
+          Please sign in again
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1 }}>
       {!activeChat ? (
@@ -526,111 +558,101 @@ export default function SupportManager() {
             </TouchableOpacity>
           </View>
 
-          {loading ? (
-            <View style={s.center}>
-              <ActivityIndicator color={theme.accent} />
-
-              <Text style={{ color: theme.text3, marginTop: 10 }}>
-                Loading support chats...
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={[
-                { type: "section", title: "Waiting Chats" },
-                ...waitingChats.map((chat) => ({
-                  type: "waiting",
-                  chat,
-                })),
-                { type: "section", title: "My Chats" },
-                ...myChats.map((chat) => ({
-                  type: "my",
-                  chat,
-                })),
-              ]}
-              keyExtractor={(item: any, index) => {
-                if (item.type === "section") return `${item.title}-${index}`;
-                return `${item.type}-${getChatId(item.chat)}-${index}`;
-              }}
-              contentContainerStyle={{ paddingBottom: 40 }}
-              renderItem={({ item }: any) => {
-                if (item.type === "section") {
-                  return (
-                    <Text style={[s.sectionTitle, { color: theme.text2 }]}>
-                      {item.title}
-                    </Text>
-                  );
-                }
-
-                const chat: Chat = item.chat;
-                const chatId = getChatId(chat);
-                const user = getChatUser(chat);
-
+          <FlatList
+            data={[
+              { type: "section", title: "Waiting Chats" },
+              ...waitingChats.map((chat) => ({
+                type: "waiting",
+                chat,
+              })),
+              { type: "section", title: "My Chats" },
+              ...myChats.map((chat) => ({
+                type: "my",
+                chat,
+              })),
+            ]}
+            keyExtractor={(item: any, index) => {
+              if (item.type === "section") return `${item.title}-${index}`;
+              return `${item.type}-${getChatId(item.chat)}-${index}`;
+            }}
+            contentContainerStyle={{ paddingBottom: 40 }}
+            renderItem={({ item }: any) => {
+              if (item.type === "section") {
                 return (
+                  <Text style={[s.sectionTitle, { color: theme.text2 }]}>
+                    {item.title}
+                  </Text>
+                );
+              }
+
+              const chat: Chat = item.chat;
+              const chatId = getChatId(chat);
+              const user = getChatUser(chat);
+
+              return (
+                <View
+                  style={[
+                    s.chatCard,
+                    {
+                      backgroundColor: theme.bg2,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
                   <View
-                    style={[
-                      s.chatCard,
-                      {
-                        backgroundColor: theme.bg2,
-                        borderColor: theme.border,
-                      },
-                    ]}
+                    style={[s.catIcon, { backgroundColor: theme.accentBg }]}
                   >
-                    <View
-                      style={[s.catIcon, { backgroundColor: theme.accentBg }]}
+                    <Ionicons
+                      name="chatbubble-ellipses-outline"
+                      size={20}
+                      color={theme.accent}
+                    />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.chatTitle, { color: theme.text }]}>
+                      {user}
+                    </Text>
+
+                    <Text style={[s.chatSub, { color: theme.text3 }]}>
+                      Chat #{chatId.slice(0, 8)}
+                    </Text>
+                  </View>
+
+                  {item.type === "waiting" ? (
+                    <TouchableOpacity
+                      style={[s.takeBtn, { backgroundColor: theme.accent }]}
+                      onPress={() => takeChat(chat)}
+                      disabled={chatLoading}
+                    >
+                      <Text style={s.takeText}>Take</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[s.openBtn, { backgroundColor: theme.accentBg }]}
+                      onPress={() => openChat(chat)}
+                      disabled={chatLoading}
                     >
                       <Ionicons
                         name="chatbubble-ellipses-outline"
-                        size={20}
+                        size={18}
                         color={theme.accent}
                       />
-                    </View>
-
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.chatTitle, { color: theme.text }]}>
-                        {user}
-                      </Text>
-
-                      <Text style={[s.chatSub, { color: theme.text3 }]}>
-                        Chat #{chatId.slice(0, 8)}
-                      </Text>
-                    </View>
-
-                    {item.type === "waiting" ? (
-                      <TouchableOpacity
-                        style={[s.takeBtn, { backgroundColor: theme.accent }]}
-                        onPress={() => takeChat(chat)}
-                        disabled={chatLoading}
-                      >
-                        <Text style={s.takeText}>Take</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity
-                        style={[s.openBtn, { backgroundColor: theme.accentBg }]}
-                        onPress={() => openChat(chat)}
-                        disabled={chatLoading}
-                      >
-                        <Ionicons
-                          name="chatbubble-ellipses-outline"
-                          size={18}
-                          color={theme.accent}
-                        />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                );
-              }}
-              ListEmptyComponent={
-                <View style={s.center}>
-                  <Ionicons name="paw-outline" size={34} color={theme.accent} />
-
-                  <Text style={[s.emptyTitle, { color: theme.text }]}>
-                    No support chats yet
-                  </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-              }
-            />
-          )}
+              );
+            }}
+            ListEmptyComponent={
+              <View style={s.center}>
+                <Ionicons name="paw-outline" size={34} color={theme.accent} />
+
+                <Text style={[s.emptyTitle, { color: theme.text }]}>
+                  No support chats yet
+                </Text>
+              </View>
+            }
+          />
         </>
       ) : (
         <>
@@ -661,7 +683,7 @@ export default function SupportManager() {
                 s.headerBtn,
                 { backgroundColor: "rgba(248,113,113,0.12)" },
               ]}
-              onPress={closeChatTicket}
+              onPress={() => setCloseModal(true)}
             >
               <Ionicons name="close-circle-outline" size={22} color="#f87171" />
             </TouchableOpacity>

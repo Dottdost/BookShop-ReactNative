@@ -1,3 +1,4 @@
+import { useAuth } from "@/app/hooks/useAuth";
 import { useTheme } from "@/context/ThemeContext";
 import API_URL from "@/services/config/api";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,7 +8,6 @@ import { useTranslation } from "react-i18next";
 import {
   Animated,
   Image,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,44 +15,7 @@ import {
   View,
 } from "react-native";
 import cartStorage from "../../hooks/cartStorage";
-
-const wishlistStorage = {
-  _key: (): string => {
-    if (Platform.OS !== "web") return "wishlist_guest";
-
-    const userId = localStorage.getItem("userId") || "guest";
-    return `wishlist_${userId}`;
-  },
-
-  get: (): string[] => {
-    if (Platform.OS !== "web") return [];
-
-    try {
-      return JSON.parse(localStorage.getItem(wishlistStorage._key()) || "[]");
-    } catch {
-      return [];
-    }
-  },
-
-  toggle: (id: string): boolean => {
-    const list = wishlistStorage.get();
-    const idx = list.indexOf(id);
-
-    if (idx === -1) {
-      list.push(id);
-    } else {
-      list.splice(idx, 1);
-    }
-
-    if (Platform.OS === "web") {
-      localStorage.setItem(wishlistStorage._key(), JSON.stringify(list));
-    }
-
-    return idx === -1;
-  },
-
-  isLiked: (id: string): boolean => wishlistStorage.get().includes(id),
-};
+import wishlistStorage from "../../hooks/wishlistStorage";
 
 function getParamId(value: string | string[] | undefined) {
   if (Array.isArray(value)) return value[0] || "";
@@ -61,6 +24,12 @@ function getParamId(value: string | string[] | undefined) {
 
 function unwrapBook(data: any) {
   return data?.data ?? data?.book ?? data;
+}
+
+function getBookId(book: any, fallback = "") {
+  return String(
+    book?.id ?? book?.bookId ?? book?.Id ?? book?.BookId ?? fallback ?? "",
+  );
 }
 
 function SkeletonLoader() {
@@ -119,13 +88,13 @@ export default function BookDetails() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { token, userId, loading: authLoading } = useAuth();
 
   const bookId = getParamId(id);
 
   const [book, setBook] = useState<any>(null);
   const [added, setAdded] = useState(false);
   const [liked, setLiked] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
@@ -133,24 +102,6 @@ export default function BookDetails() {
   const btnScale = useRef(new Animated.Value(1)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
   const heartRotate = useRef(new Animated.Value(0)).current;
-
-  useFocusEffect(
-    useCallback(() => {
-      if (Platform.OS === "web") {
-        setIsLoggedIn(!!localStorage.getItem("token"));
-      }
-
-      if (bookId) {
-        setLiked(wishlistStorage.isLiked(bookId));
-      }
-    }, [bookId]),
-  );
-
-  useEffect(() => {
-    if (!bookId) return;
-
-    void loadBook(bookId);
-  }, [bookId]);
 
   const resetAnimation = () => {
     fadeAnim.setValue(0);
@@ -172,9 +123,6 @@ export default function BookDetails() {
       const loadedBook = unwrapBook(data);
 
       setBook(loadedBook);
-      setLiked(
-        wishlistStorage.isLiked(String(loadedBook?.id ?? currentBookId)),
-      );
 
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -198,7 +146,38 @@ export default function BookDetails() {
     }
   };
 
-  const handleAddToCart = () => {
+  const checkLiked = async () => {
+    if (!bookId || !token || !userId) {
+      setLiked(false);
+      return;
+    }
+
+    const currentBookId = getBookId(book, bookId);
+    const likedValue = await wishlistStorage.isLikedAsync(
+      currentBookId,
+      userId,
+    );
+
+    setLiked(likedValue);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      void checkLiked();
+    }, [bookId, book?.id, token, userId]),
+  );
+
+  useEffect(() => {
+    if (!bookId) return;
+
+    void loadBook(bookId);
+  }, [bookId]);
+
+  useEffect(() => {
+    void checkLiked();
+  }, [book?.id, token, userId]);
+
+  const handleAddToCart = async () => {
     Animated.sequence([
       Animated.timing(btnScale, {
         toValue: 0.92,
@@ -212,26 +191,43 @@ export default function BookDetails() {
       }),
     ]).start();
 
-    if (book) {
-      const currentBookId = String(book.id ?? bookId);
+    if (authLoading) return;
 
-      cartStorage.add({
-        bookId: currentBookId,
-        title: book.title,
-        author: book.author,
-        imageUrl: book.imageUrl,
-        price: Number(book.price ?? 0),
-      });
+    if (!token || !userId) {
+      router.push("/sign-in");
+      return;
+    }
+
+    if (book) {
+      const currentBookId = getBookId(book, bookId);
+
+      await cartStorage.addAsync(
+        {
+          bookId: currentBookId,
+          title: String(book.title ?? book.Title ?? ""),
+          author: String(book.author ?? book.Author ?? ""),
+          imageUrl: String(book.imageUrl ?? book.ImageUrl ?? ""),
+          price: Number(book.price ?? book.Price ?? 0),
+        },
+        userId,
+      );
     }
 
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
 
-  const handleLike = () => {
-    const currentBookId = String(book?.id ?? bookId);
+  const handleLike = async () => {
+    if (authLoading) return;
 
-    const newVal = wishlistStorage.toggle(currentBookId);
+    if (!token || !userId) {
+      router.push("/sign-in");
+      return;
+    }
+
+    const currentBookId = getBookId(book, bookId);
+
+    const newVal = await wishlistStorage.toggleAsync(currentBookId, userId);
     setLiked(newVal);
 
     Animated.sequence([
@@ -276,7 +272,15 @@ export default function BookDetails() {
         <Animated.View
           style={[styles.imageWrapper, { transform: [{ scale: scaleImg }] }]}
         >
-          <Image source={{ uri: book.imageUrl }} style={styles.image} />
+          <Image
+            source={{
+              uri:
+                book.imageUrl ||
+                book.ImageUrl ||
+                "https://placehold.co/360x520/241633/d8b4fe?text=Book",
+            }}
+            style={styles.image}
+          />
 
           <View
             style={[
@@ -290,31 +294,26 @@ export default function BookDetails() {
           />
 
           <View style={styles.priceBadge}>
-            <Text style={styles.priceBadgeText}>${book.price}</Text>
+            <Text style={styles.priceBadgeText}>${book.price ?? 0}</Text>
           </View>
 
-          {isLoggedIn && (
-            <TouchableOpacity
-              style={styles.likeBtn}
-              onPress={handleLike}
-              activeOpacity={0.8}
+          <TouchableOpacity
+            style={styles.likeBtn}
+            onPress={handleLike}
+            activeOpacity={0.8}
+          >
+            <Animated.View
+              style={{
+                transform: [{ scale: heartScale }, { rotate: heartRotateDeg }],
+              }}
             >
-              <Animated.View
-                style={{
-                  transform: [
-                    { scale: heartScale },
-                    { rotate: heartRotateDeg },
-                  ],
-                }}
-              >
-                <Ionicons
-                  name={liked ? "heart" : "heart-outline"}
-                  size={24}
-                  color={liked ? "#f43f5e" : "white"}
-                />
-              </Animated.View>
-            </TouchableOpacity>
-          )}
+              <Ionicons
+                name={liked ? "heart" : "heart-outline"}
+                size={24}
+                color={liked ? "#f43f5e" : "white"}
+              />
+            </Animated.View>
+          </TouchableOpacity>
         </Animated.View>
 
         <Animated.View
@@ -324,7 +323,7 @@ export default function BookDetails() {
           ]}
         >
           <View style={styles.tagsRow}>
-            {book.genreName && (
+            {!!book.genreName && (
               <View
                 style={[
                   styles.tag,
@@ -351,11 +350,11 @@ export default function BookDetails() {
               <Ionicons name="layers-outline" size={11} color={theme.accent} />
 
               <Text style={[styles.tagText, { color: theme.accent }]}>
-                {t("bookDetails.inStock", { count: book.stock })}
+                {t("bookDetails.inStock", { count: book.stock ?? 0 })}
               </Text>
             </View>
 
-            {book.publisherName && (
+            {!!book.publisherName && (
               <View
                 style={[
                   styles.tag,
@@ -403,7 +402,7 @@ export default function BookDetails() {
             </View>
 
             <Text style={[styles.description, { color: theme.text2 }]}>
-              {book.description}
+              {book.description || "No description"}
             </Text>
           </View>
 
@@ -437,11 +436,11 @@ export default function BookDetails() {
               </Text>
 
               <Text style={[styles.detailValue, { color: theme.text }]}>
-                {book.genreName}
+                {book.genreName || "—"}
               </Text>
             </View>
 
-            {book.publisherName && (
+            {!!book.publisherName && (
               <>
                 <View
                   style={[
@@ -480,7 +479,7 @@ export default function BookDetails() {
               </Text>
 
               <Text style={[styles.detailValue, { color: theme.text }]}>
-                {book.stock}
+                {book.stock ?? 0}
               </Text>
             </View>
           </View>
@@ -501,7 +500,7 @@ export default function BookDetails() {
       >
         <TouchableOpacity
           style={[styles.backBtn, { backgroundColor: theme.accentBg }]}
-          onPress={() => router.replace("/books")}
+          onPress={() => router.back()}
         >
           <Ionicons name="chevron-back" size={22} color={theme.accent} />
         </TouchableOpacity>
