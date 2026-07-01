@@ -1,9 +1,10 @@
-import API_URL from "@/.expo/config/api";
 import { useTheme } from "@/context/ThemeContext";
+import API_URL from "@/services/config/api";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Animated,
@@ -13,7 +14,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useTranslation } from "react-i18next";
 
 export default function SignUp() {
   const { theme } = useTheme();

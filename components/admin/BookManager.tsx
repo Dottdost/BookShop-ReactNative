@@ -1,6 +1,6 @@
-import API_URL from "@/.expo/config/api";
 import { useAuth } from "@/app/hooks/useAuth";
 import { useTheme } from "@/context/ThemeContext";
+import API_URL from "@/services/config/api";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useState } from "react";
@@ -668,13 +668,14 @@ export default function BookManager() {
         >
           <Text
             style={[s.selectText, { color: value ? theme.text : theme.text3 }]}
+            numberOfLines={1}
           >
             {value || placeholder}
           </Text>
 
           <Ionicons
             name={opened ? "chevron-up-outline" : "chevron-down-outline"}
-            size={18}
+            size={20}
             color={theme.accent}
           />
         </TouchableOpacity>
@@ -689,7 +690,7 @@ export default function BookManager() {
               },
             ]}
           >
-            <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }}>
+            <ScrollView nestedScrollEnabled style={{ maxHeight: 190 }}>
               {options.length > 0 ? (
                 options.map((option) => {
                   const active = String(option.id) === String(selectedId);
@@ -714,6 +715,7 @@ export default function BookManager() {
                             color: active ? theme.accent : theme.text,
                           },
                         ]}
+                        numberOfLines={1}
                       >
                         {option.name}
                       </Text>
@@ -721,7 +723,7 @@ export default function BookManager() {
                       {active && (
                         <Ionicons
                           name="checkmark-outline"
-                          size={16}
+                          size={17}
                           color={theme.accent}
                         />
                       )}
@@ -971,7 +973,8 @@ export default function BookManager() {
                     style={{
                       color: theme.text,
                       flex: 1,
-                      paddingVertical: 10,
+                      paddingVertical: 12,
+                      fontSize: 14,
                     }}
                     keyboardType={kb || "default"}
                     multiline={key === "description"}
@@ -1336,7 +1339,7 @@ const s = StyleSheet.create({
 
   sheetScroll: {
     padding: 22,
-    gap: 10,
+    gap: 12,
   },
 
   sheetTitle: {
@@ -1398,25 +1401,32 @@ const s = StyleSheet.create({
   input: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: 14,
+    minHeight: 52,
   },
 
   dropdownBlock: {
-    gap: 7,
+    marginTop: 2,
+    marginBottom: 4,
+    zIndex: 50,
+    elevation: 50,
   },
 
   dropdownLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "800",
-    paddingHorizontal: 14,
+    marginBottom: 7,
+    paddingHorizontal: 2,
   },
 
   selectBox: {
-    borderRadius: 14,
+    minHeight: 52,
+    borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: 14,
+    paddingVertical: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1426,17 +1436,23 @@ const s = StyleSheet.create({
   selectText: {
     flex: 1,
     fontSize: 14,
+    lineHeight: 20,
     fontWeight: "700",
+    includeFontPadding: false,
+    textAlignVertical: "center",
   },
 
   dropdownList: {
     borderWidth: 1,
     borderRadius: 16,
     overflow: "hidden",
-    marginTop: 1,
+    marginTop: 8,
+    zIndex: 60,
+    elevation: 60,
   },
 
   dropdownItem: {
+    minHeight: 44,
     paddingHorizontal: 14,
     paddingVertical: 11,
     flexDirection: "row",
@@ -1448,11 +1464,14 @@ const s = StyleSheet.create({
   dropdownItemText: {
     flex: 1,
     fontSize: 14,
+    lineHeight: 19,
     fontWeight: "700",
+    includeFontPadding: false,
   },
 
   emptyDropdown: {
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     fontSize: 13,
     fontWeight: "700",
     textAlign: "center",

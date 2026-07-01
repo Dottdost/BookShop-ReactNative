@@ -3,12 +3,14 @@ import BookManager from "@/components/admin/BookManager";
 import GenreManager from "@/components/admin/GenreManager";
 import OrderManager from "@/components/admin/OrderManager";
 import PromoManager from "@/components/admin/PromoManager";
+import PublisherManager from "@/components/admin/PublisherManager";
 import SupportManager from "@/components/admin/SupportManager";
 import UserManager from "@/components/admin/UserManager";
 import { useTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Animated,
   ScrollView,
@@ -17,34 +19,32 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useTranslation } from "react-i18next";
 
 const TABS = [
-  { key: "books", labelKey: "adminScreen.books", icon: "book-outline" },
-  { key: "users", labelKey: "adminScreen.users", icon: "people-outline" },
-  { key: "orders", labelKey: "adminScreen.orders", icon: "receipt-outline" },
-  {
-    key: "support",
-    labelKey: "adminScreen.support",
-    icon: "chatbubbles-outline",
-  },
-  { key: "promos", labelKey: "adminScreen.promos", icon: "pricetag-outline" },
-  { key: "genres", labelKey: "adminScreen.genres", icon: "bookmark-outline" },
+  { key: "books", label: "Books", icon: "book-outline" },
+  { key: "users", label: "Users", icon: "people-outline" },
+  { key: "orders", label: "Orders", icon: "receipt-outline" },
+  { key: "support", label: "Support", icon: "chatbubbles-outline" },
+  { key: "promos", label: "Promos", icon: "pricetag-outline" },
+  { key: "genres", label: "Genres", icon: "bookmark-outline" },
+  { key: "publishers", label: "Publishers", icon: "business-outline" },
 ];
 
 export default function AdminPanel() {
   const { theme } = useTheme();
   const { t } = useTranslation();
   const { isAdmin, isSuperAdmin } = useAuth();
+
   const [activeTab, setActiveTab] = useState("books");
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useFocusEffect(
     useCallback(() => {
       fadeAnim.setValue(0);
+
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 400,
+        duration: 350,
         useNativeDriver: false,
       }).start();
     }, []),
@@ -54,11 +54,9 @@ export default function AdminPanel() {
     return (
       <View
         style={[
-          s.container,
+          s.deniedContainer,
           {
             backgroundColor: theme.bg,
-            justifyContent: "center",
-            alignItems: "center",
           },
         ]}
       >
@@ -68,7 +66,7 @@ export default function AdminPanel() {
           {t("adminScreen.accessDenied")}
         </Text>
 
-        <Text style={{ color: theme.text3, marginTop: 8, textAlign: "center" }}>
+        <Text style={[s.deniedSub, { color: theme.text3 }]}>
           {t("adminScreen.privilegesRequired")}
         </Text>
 
@@ -76,9 +74,7 @@ export default function AdminPanel() {
           style={[s.backBtn, { backgroundColor: theme.accent }]}
           onPress={() => router.replace("/profile")}
         >
-          <Text style={{ color: "white", fontWeight: "700" }}>
-            {t("adminScreen.goBack")}
-          </Text>
+          <Text style={s.backBtnText}>{t("adminScreen.goBack")}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -86,10 +82,16 @@ export default function AdminPanel() {
 
   return (
     <Animated.View
-      style={[s.container, { backgroundColor: theme.bg, opacity: fadeAnim }]}
+      style={[
+        s.container,
+        {
+          backgroundColor: theme.bg,
+          opacity: fadeAnim,
+        },
+      ]}
     >
       <View style={[s.header, { borderBottomColor: theme.border }]}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={[s.headerTitle, { color: theme.text }]}>
             {t("adminScreen.adminPanel")}
           </Text>
@@ -118,54 +120,59 @@ export default function AdminPanel() {
         </View>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[s.tabBar, { borderBottomColor: theme.border }]}
-        contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}
-      >
-        {TABS.map((tab) => {
-          const active = activeTab === tab.key;
+      <View style={[s.tabsWrapper, { borderBottomColor: theme.border }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.tabsContent}
+        >
+          {TABS.map((tab) => {
+            const active = activeTab === tab.key;
 
-          return (
-            <TouchableOpacity
-              key={tab.key}
-              onPress={() => setActiveTab(tab.key)}
-              style={[
-                s.tab,
-                {
-                  backgroundColor: active ? theme.accent : theme.bg2,
-                  borderColor: active ? theme.accent : theme.border,
-                },
-              ]}
-            >
-              <Ionicons
-                name={tab.icon as any}
-                size={13}
-                color={active ? "white" : theme.text2}
-              />
-
-              <Text
-                style={{
-                  color: active ? "white" : theme.text2,
-                  fontSize: 13,
-                  fontWeight: active ? "600" : "400",
-                }}
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                activeOpacity={0.85}
+                onPress={() => setActiveTab(tab.key)}
+                style={[
+                  s.tab,
+                  {
+                    backgroundColor: active ? theme.accent : theme.bg2,
+                    borderColor: active ? theme.accent : theme.border,
+                  },
+                ]}
               >
-                {t(tab.labelKey)}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+                <Ionicons
+                  name={tab.icon as any}
+                  size={14}
+                  color={active ? "white" : theme.text2}
+                />
 
-      <View style={{ flex: 1, padding: 16 }}>
+                <Text
+                  style={[
+                    s.tabText,
+                    {
+                      color: active ? "white" : theme.text2,
+                      fontWeight: active ? "800" : "500",
+                    },
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <View style={s.content}>
         {activeTab === "books" && <BookManager />}
         {activeTab === "users" && <UserManager />}
         {activeTab === "orders" && <OrderManager />}
         {activeTab === "support" && <SupportManager />}
         {activeTab === "promos" && <PromoManager />}
         {activeTab === "genres" && <GenreManager />}
+        {activeTab === "publishers" && <PublisherManager />}
       </View>
     </Animated.View>
   );
@@ -174,6 +181,39 @@ export default function AdminPanel() {
 const s = StyleSheet.create({
   container: {
     flex: 1,
+  },
+
+  deniedContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+
+  denied: {
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 16,
+    textAlign: "center",
+  },
+
+  deniedSub: {
+    marginTop: 8,
+    textAlign: "center",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
+  backBtn: {
+    marginTop: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+
+  backBtnText: {
+    color: "white",
+    fontWeight: "800",
   },
 
   header: {
@@ -187,29 +227,34 @@ const s = StyleSheet.create({
   },
 
   headerTitle: {
-    fontSize: 22,
-    fontWeight: "800",
+    fontSize: 24,
+    fontWeight: "900",
   },
 
   headerRole: {
     fontSize: 13,
-    fontWeight: "600",
-    marginTop: 2,
+    fontWeight: "800",
+    marginTop: 3,
   },
 
   shield: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
   },
 
-  tabBar: {
+  tabsWrapper: {
     flexGrow: 0,
     borderBottomWidth: 1,
     paddingVertical: 12,
+  },
+
+  tabsContent: {
+    paddingHorizontal: 14,
+    gap: 8,
   },
 
   tab: {
@@ -217,21 +262,17 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 9,
+    borderRadius: 999,
     borderWidth: 1,
   },
 
-  denied: {
-    fontSize: 22,
-    fontWeight: "800",
-    marginTop: 16,
+  tabText: {
+    fontSize: 13,
   },
 
-  backBtn: {
-    marginTop: 24,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderRadius: 14,
+  content: {
+    flex: 1,
+    padding: 16,
   },
 });

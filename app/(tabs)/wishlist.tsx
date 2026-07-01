@@ -1,5 +1,5 @@
-import API_URL from "@/.expo/config/api";
 import { useTheme } from "@/context/ThemeContext";
+import API_URL from "@/services/config/api";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";

@@ -1,6 +1,6 @@
-import API_URL from "@/.expo/config/api";
 import { useAuth } from "@/app/hooks/useAuth";
 import { useTheme } from "@/context/ThemeContext";
+import API_URL from "@/services/config/api";
 import {
   listenOrderStatus,
   removeOrderStatusListener,

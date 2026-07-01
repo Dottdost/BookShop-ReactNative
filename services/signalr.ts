@@ -1,4 +1,4 @@
-import API_URL from "@/.expo/config/api";
+import API_URL from "@/services/config/api";
 import * as signalR from "@microsoft/signalr";
 
 let chatConnection: signalR.HubConnection | null = null;
