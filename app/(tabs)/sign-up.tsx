@@ -1,3 +1,4 @@
+import PrettyAlert from "@/components/ui/PrettyAlert";
 import { useTheme } from "@/context/ThemeContext";
 import API_URL from "@/services/config/api";
 import { Ionicons } from "@expo/vector-icons";
@@ -5,14 +6,26 @@ import { router } from "expo-router";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
   Animated,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+
+const storage = {
+  set: async (key: string, value: string) => {
+    if (Platform.OS === "web") {
+      localStorage.setItem(key, value);
+      return;
+    }
+
+    const SecureStore = await import("expo-secure-store");
+    await SecureStore.setItemAsync(key, value);
+  },
+};
 
 async function readResponse(res: Response) {
   const text = await res.text();
@@ -38,25 +51,12 @@ async function readResponse(res: Response) {
 }
 
 function extractErrorMessage(data: any, text: string, fallback: string) {
-  if (typeof data === "string" && data.trim()) {
-    return data;
-  }
+  if (typeof data === "string" && data.trim()) return data;
 
-  if (data?.message) {
-    return String(data.message);
-  }
-
-  if (data?.title) {
-    return String(data.title);
-  }
-
-  if (data?.error) {
-    return String(data.error);
-  }
-
-  if (data?.innerException) {
-    return String(data.innerException);
-  }
+  if (data?.message) return String(data.message);
+  if (data?.title) return String(data.title);
+  if (data?.error) return String(data.error);
+  if (data?.innerException) return String(data.innerException);
 
   if (data?.errors) {
     const messages = Object.values(data.errors).flat().filter(Boolean);
@@ -66,9 +66,7 @@ function extractErrorMessage(data: any, text: string, fallback: string) {
     }
   }
 
-  if (text?.trim()) {
-    return text.trim();
-  }
+  if (text?.trim()) return text.trim();
 
   return fallback;
 }
@@ -182,6 +180,51 @@ async function registerRequest(payload: any) {
   };
 }
 
+async function loginAfterRegister(username: string, password: string) {
+  const res = await fetch(`${API_URL}/api/v1/Auth/Login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/plain, */*",
+    },
+    body: JSON.stringify({
+      username,
+      password,
+    }),
+  });
+
+  const { text, data } = await readResponse(res);
+
+  if (!res.ok) {
+    throw new Error(
+      extractErrorMessage(
+        data,
+        text,
+        `Account created, but automatic login failed. Status ${res.status}`,
+      ),
+    );
+  }
+
+  const token =
+    data?.data?.accessToken ??
+    data?.accessToken ??
+    data?.token ??
+    data?.data?.token ??
+    "";
+
+  const userId =
+    data?.data?.userId ?? data?.userId ?? data?.id ?? data?.data?.id ?? "";
+
+  if (!token || !userId) {
+    throw new Error(
+      "Account created, but login response did not return token.",
+    );
+  }
+
+  await storage.set("token", String(token));
+  await storage.set("userId", String(userId));
+}
+
 export default function SignUp() {
   const { theme } = useTheme();
   const { t } = useTranslation();
@@ -195,7 +238,56 @@ export default function SignUp() {
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const [alert, setAlert] = useState({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info" as "success" | "error" | "warning" | "info",
+    goToProfile: false,
+    goToSignIn: false,
+  });
+
   const btnScale = useRef(new Animated.Value(1)).current;
+
+  const showAlert = (
+    title: string,
+    message: string,
+    type: "success" | "error" | "warning" | "info" = "info",
+    options?: {
+      goToProfile?: boolean;
+      goToSignIn?: boolean;
+    },
+  ) => {
+    setAlert({
+      visible: true,
+      title,
+      message,
+      type,
+      goToProfile: Boolean(options?.goToProfile),
+      goToSignIn: Boolean(options?.goToSignIn),
+    });
+  };
+
+  const closeAlert = () => {
+    const shouldGoProfile = alert.goToProfile;
+    const shouldGoSignIn = alert.goToSignIn;
+
+    setAlert((prev) => ({
+      ...prev,
+      visible: false,
+      goToProfile: false,
+      goToSignIn: false,
+    }));
+
+    if (shouldGoProfile) {
+      router.replace("/profile");
+      return;
+    }
+
+    if (shouldGoSignIn) {
+      router.replace("/sign-in");
+    }
+  };
 
   const pressAnim = () => {
     Animated.sequence([
@@ -217,24 +309,41 @@ export default function SignUp() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanUsername || !cleanEmail || !password || !confirmPassword) {
-      Alert.alert(t("common.error"), t("auth.allFieldsRequired"));
+      showAlert("Missing fields", t("auth.allFieldsRequired"), "warning");
+      return;
+    }
+
+    if (cleanUsername.length < 6) {
+      showAlert(
+        "Username is too short",
+        "Username must be at least 6 characters.",
+        "warning",
+      );
       return;
     }
 
     if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
-      Alert.alert(t("common.error"), "Email is invalid.");
+      showAlert(
+        "Invalid email",
+        "Please enter a valid email address.",
+        "warning",
+      );
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert(t("common.error"), t("auth.passwordsDoNotMatch"));
+      showAlert(
+        "Passwords do not match",
+        t("auth.passwordsDoNotMatch"),
+        "warning",
+      );
       return;
     }
 
     const passwordError = validatePassword(password);
 
     if (passwordError) {
-      Alert.alert(t("auth.registrationFailed"), passwordError);
+      showAlert("Password is weak", passwordError, "warning");
       return;
     }
 
@@ -259,26 +368,36 @@ export default function SignUp() {
           t,
         );
 
-        Alert.alert(
-          t("auth.registrationFailed"),
-          `${friendlyMessage}\n\nEndpoint: ${result.endpoint}\nStatus: ${
-            result.status ?? "unknown"
-          }`,
-        );
-
+        showAlert(t("auth.registrationFailed"), friendlyMessage, "error");
         return;
       }
 
-      Alert.alert(t("common.success"), t("auth.accountCreated"), [
-        {
-          text: "OK",
-          onPress: () => router.replace("/sign-in"),
-        },
-      ]);
+      try {
+        await loginAfterRegister(cleanUsername, password);
+
+        showAlert(
+          t("common.success"),
+          "Account created and signed in successfully.",
+          "success",
+          {
+            goToProfile: true,
+          },
+        );
+      } catch (loginError: any) {
+        showAlert(
+          t("common.success"),
+          loginError?.message || "Account created. Please sign in to continue.",
+          "success",
+          {
+            goToSignIn: true,
+          },
+        );
+      }
     } catch (error: any) {
-      Alert.alert(
+      showAlert(
         t("auth.registrationFailed"),
         error?.message || t("common.somethingWentWrong"),
+        "error",
       );
     } finally {
       setLoading(false);
@@ -403,7 +522,8 @@ export default function SignUp() {
         )}
 
         <Text style={[styles.passwordHint, { color: theme.text3 }]}>
-          Password: 6+ chars, uppercase, lowercase, number and special symbol.
+          Username: 6+ chars. Password: 6+ chars, uppercase, lowercase, number
+          and special symbol.
         </Text>
 
         <Animated.View style={{ transform: [{ scale: btnScale }] }}>
@@ -444,6 +564,14 @@ export default function SignUp() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <PrettyAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        onClose={closeAlert}
+      />
     </View>
   );
 }

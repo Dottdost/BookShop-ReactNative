@@ -1,13 +1,29 @@
 import API_URL from "@/services/config/api";
 import * as signalR from "@microsoft/signalr";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 
 let chatConnection: signalR.HubConnection | null = null;
 let orderConnection: signalR.HubConnection | null = null;
 
-function getToken() {
-  if (typeof localStorage === "undefined") return null;
+async function getToken() {
+  if (Platform.OS === "web") {
+    if (typeof localStorage === "undefined") return null;
 
-  return localStorage.getItem("accessToken") || localStorage.getItem("token");
+    return localStorage.getItem("accessToken") || localStorage.getItem("token");
+  }
+
+  const secureToken =
+    (await SecureStore.getItemAsync("accessToken")) ||
+    (await SecureStore.getItemAsync("token"));
+
+  if (secureToken) return secureToken;
+
+  return (
+    (await AsyncStorage.getItem("accessToken")) ||
+    (await AsyncStorage.getItem("token"))
+  );
 }
 
 /* =========================
@@ -15,7 +31,7 @@ function getToken() {
 ========================= */
 
 export async function getChatSignalRConnection() {
-  const token = getToken();
+  const token = await getToken();
 
   if (!token) {
     throw new Error("SignalR token not found.");
@@ -87,6 +103,7 @@ export async function listenChatMessages(callback: (...args: any[]) => void) {
   const hub = await getChatSignalRConnection();
 
   hub.off("ReceiveMessage");
+
   hub.on("ReceiveMessage", (...args: any[]) => {
     console.log("CHAT SIGNALR RECEIVED:", args);
     callback(...args);
@@ -99,7 +116,6 @@ export function removeChatMessageListener() {
   chatConnection.off("ReceiveMessage");
 }
 
-// aliases для SupportChatWidget.tsx
 export async function onReceiveMessage(callback: (...args: any[]) => void) {
   await listenChatMessages(callback);
 }
@@ -113,11 +129,15 @@ export async function offReceiveMessage() {
 ========================= */
 
 export async function getOrderSignalRConnection() {
+  const token = await getToken();
+
+  if (!token) {
+    throw new Error("SignalR token not found.");
+  }
+
   if (orderConnection?.state === signalR.HubConnectionState.Connected) {
     return orderConnection;
   }
-
-  const token = getToken();
 
   if (
     orderConnection &&
@@ -132,7 +152,7 @@ export async function getOrderSignalRConnection() {
 
   orderConnection = new signalR.HubConnectionBuilder()
     .withUrl(`${API_URL}/orderHub`, {
-      accessTokenFactory: () => token ?? "",
+      accessTokenFactory: () => token,
     })
     .withAutomaticReconnect()
     .configureLogging(signalR.LogLevel.Information)

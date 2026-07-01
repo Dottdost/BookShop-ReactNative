@@ -1,11 +1,11 @@
 import { useAuth } from "@/app/hooks/useAuth";
+import PrettyAlert from "@/components/ui/PrettyAlert";
 import { useTheme } from "@/context/ThemeContext";
 import API_URL from "@/services/config/api";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Platform,
   StyleSheet,
@@ -96,6 +96,46 @@ function unwrapPaged<T>(
   };
 }
 
+async function readResponse(res: Response) {
+  const text = await res.text();
+
+  if (!text) {
+    return {
+      text: "",
+      data: null,
+    };
+  }
+
+  try {
+    return {
+      text,
+      data: JSON.parse(text),
+    };
+  } catch {
+    return {
+      text,
+      data: null,
+    };
+  }
+}
+
+function cleanError(text: string, fallback: string) {
+  if (!text) return fallback;
+
+  try {
+    const json = JSON.parse(text);
+
+    if (json.errors) {
+      const messages = Object.values(json.errors).flat().join("\n");
+      return messages || json.title || fallback;
+    }
+
+    return json.title || json.message || text || fallback;
+  } catch {
+    return text || fallback;
+  }
+}
+
 function normalizeRoles(user: ApiUser): string[] {
   const roles = user.roles;
 
@@ -135,35 +175,9 @@ function normalizeUsers(users: ApiUser[]): User[] {
   }));
 }
 
-function showMessage(title: string, message: string) {
-  if (Platform.OS === "web") {
-    window.alert(`${title}\n${message}`);
-    return;
-  }
-
-  Alert.alert(title, message);
-}
-
-function confirmAction(title: string, message: string, onConfirm: () => void) {
-  if (Platform.OS === "web") {
-    const ok = window.confirm(`${title}\n${message}`);
-    if (ok) onConfirm();
-    return;
-  }
-
-  Alert.alert(title, message, [
-    { text: "Cancel", style: "cancel" },
-    {
-      text: "Delete",
-      style: "destructive",
-      onPress: onConfirm,
-    },
-  ]);
-}
-
 export default function UserManager() {
   const { theme } = useTheme();
-  const { token: authToken, isSuperAdmin } = useAuth();
+  const { token: authToken, isSuperAdmin, loading: authLoading } = useAuth();
 
   const token = useMemo(() => getWebToken() || authToken || null, [authToken]);
 
@@ -175,7 +189,98 @@ export default function UserManager() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
+  const [alert, setAlert] = useState({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info" as "success" | "error" | "warning" | "info",
+  });
+
+  const [confirm, setConfirm] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: "warning" | "error";
+    confirmText: string;
+    action: null | (() => void);
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "warning",
+    confirmText: "Confirm",
+    action: null,
+  });
+
+  const showMessage = (
+    title: string,
+    message: string,
+    type: "success" | "error" | "warning" | "info" = "info",
+  ) => {
+    setAlert({
+      visible: true,
+      title,
+      message,
+      type,
+    });
+  };
+
+  const closeAlert = () => {
+    setAlert((prev) => ({
+      ...prev,
+      visible: false,
+    }));
+  };
+
+  const askConfirm = (
+    title: string,
+    message: string,
+    confirmText: string,
+    action: () => void,
+    type: "warning" | "error" = "warning",
+  ) => {
+    setConfirm({
+      visible: true,
+      title,
+      message,
+      type,
+      confirmText,
+      action,
+    });
+  };
+
+  const closeConfirm = () => {
+    setConfirm((prev) => ({
+      ...prev,
+      visible: false,
+      action: null,
+    }));
+  };
+
+  const runConfirm = () => {
+    const action = confirm.action;
+
+    closeConfirm();
+
+    if (action) {
+      action();
+    }
+  };
+
   const load = async (currentPage = page) => {
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
+    if (!token) {
+      setUsers([]);
+      setTotalCount(0);
+      setTotalPages(1);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -187,12 +292,13 @@ export default function UserManager() {
         },
       );
 
-      const data = await res.json();
+      const { text, data } = await readResponse(res);
 
       if (!res.ok) {
         showMessage(
           "Error loading users",
-          data?.message || `Status ${res.status}`,
+          cleanError(text, `Status ${res.status}`),
+          "error",
         );
         return;
       }
@@ -205,7 +311,7 @@ export default function UserManager() {
       setTotalPages(paged.totalPages);
       setTotalCount(paged.totalCount);
     } catch (e: any) {
-      showMessage("Error", e?.message || "Error loading users");
+      showMessage("Error", e?.message || "Error loading users", "error");
     } finally {
       setLoading(false);
     }
@@ -213,7 +319,7 @@ export default function UserManager() {
 
   useEffect(() => {
     void load(page);
-  }, [token, page]);
+  }, [token, page, authLoading]);
 
   const refreshAfterChange = async () => {
     if (users.length === 1 && page > 1) {
@@ -225,92 +331,125 @@ export default function UserManager() {
   };
 
   const deleteUser = (userName: string) => {
-    confirmAction("Delete User", `Delete ${userName}?`, async () => {
-      try {
-        const res = await fetch(
-          `${API_URL}/api/v1/Admin/delete-user-by-name/${encodeURIComponent(
-            userName,
-          )}`,
-          {
-            method: "DELETE",
-            headers: authH(token),
-          },
-        );
-
-        const text = await res.text();
-
-        if (!res.ok) {
-          showMessage(
-            "Delete failed",
-            text || `Status ${res.status}. Try logging in again.`,
+    askConfirm(
+      "Delete user?",
+      `Are you sure you want to delete "${userName}"? This action cannot be undone.`,
+      "Delete",
+      async () => {
+        try {
+          const res = await fetch(
+            `${API_URL}/api/v1/Admin/delete-user-by-name/${encodeURIComponent(
+              userName,
+            )}`,
+            {
+              method: "DELETE",
+              headers: authH(token),
+            },
           );
-          return;
+
+          const { text } = await readResponse(res);
+
+          if (!res.ok) {
+            showMessage(
+              "Delete failed",
+              cleanError(text, `Status ${res.status}. Try logging in again.`),
+              "error",
+            );
+            return;
+          }
+
+          showMessage("Success", "User deleted.", "success");
+          await refreshAfterChange();
+        } catch (e: any) {
+          showMessage("Error", e?.message || "Error deleting user", "error");
         }
-
-        showMessage("Success", "User deleted.");
-        await refreshAfterChange();
-      } catch (e: any) {
-        showMessage("Error", e?.message || "Error deleting user");
-      }
-    });
+      },
+      "error",
+    );
   };
 
-  const assignAdmin = async (userName: string) => {
-    try {
-      const res = await fetch(
-        `${API_URL}/api/v1/Admin/assign-admin-role-by-name/${encodeURIComponent(
-          userName,
-        )}`,
-        {
-          method: "POST",
-          headers: authH(token),
-        },
-      );
+  const assignAdmin = (userName: string) => {
+    askConfirm(
+      "Assign admin role?",
+      `Give "${userName}" Admin permissions?`,
+      "Assign",
+      async () => {
+        try {
+          const res = await fetch(
+            `${API_URL}/api/v1/Admin/assign-admin-role-by-name/${encodeURIComponent(
+              userName,
+            )}`,
+            {
+              method: "POST",
+              headers: authH(token),
+            },
+          );
 
-      const text = await res.text();
+          const { text } = await readResponse(res);
 
-      if (!res.ok) {
-        showMessage(
-          "Assign admin failed",
-          text || `Status ${res.status}. Try logging in again.`,
-        );
-        return;
-      }
+          if (!res.ok) {
+            showMessage(
+              "Assign admin failed",
+              cleanError(text, `Status ${res.status}. Try logging in again.`),
+              "error",
+            );
+            return;
+          }
 
-      showMessage("Success", `${userName} is now Admin.`);
-      await load(page);
-    } catch (e: any) {
-      showMessage("Error", e?.message || "Error assigning admin role");
-    }
+          showMessage("Success", `${userName} is now Admin.`, "success");
+          await load(page);
+        } catch (e: any) {
+          showMessage(
+            "Error",
+            e?.message || "Error assigning admin role",
+            "error",
+          );
+        }
+      },
+      "warning",
+    );
   };
 
-  const removeAdmin = async (userName: string) => {
-    try {
-      const res = await fetch(
-        `${API_URL}/api/v1/Admin/remove-admin-role-by-name/${encodeURIComponent(
-          userName,
-        )}`,
-        {
-          method: "POST",
-          headers: authH(token),
-        },
-      );
+  const removeAdmin = (userName: string) => {
+    askConfirm(
+      "Remove admin role?",
+      `Remove Admin permissions from "${userName}"?`,
+      "Remove",
+      async () => {
+        try {
+          const res = await fetch(
+            `${API_URL}/api/v1/Admin/remove-admin-role-by-name/${encodeURIComponent(
+              userName,
+            )}`,
+            {
+              method: "POST",
+              headers: authH(token),
+            },
+          );
 
-      const text = await res.text();
+          const { text } = await readResponse(res);
 
-      if (!res.ok) {
-        showMessage(
-          "Remove admin failed",
-          text || `Status ${res.status}. Try logging in again.`,
-        );
-        return;
-      }
+          if (!res.ok) {
+            showMessage(
+              "Remove admin failed",
+              cleanError(text, `Status ${res.status}. Try logging in again.`),
+              "error",
+            );
+            return;
+          }
 
-      showMessage("Success", "Admin role removed.");
-      await load(page);
-    } catch (e: any) {
-      showMessage("Error", e?.message || "Error removing admin role");
-    }
+          showMessage("Success", "Admin role removed.", "success");
+          await load(page);
+        } catch (e: any) {
+          showMessage(
+            "Error",
+            e?.message || "Error removing admin role",
+            "error",
+          );
+        }
+      },
+      "warning",
+    );
   };
 
   return (
@@ -333,6 +472,14 @@ export default function UserManager() {
 
       {loading ? (
         <ActivityIndicator color={theme.accent} style={{ marginTop: 20 }} />
+      ) : !token ? (
+        <View style={s.emptyBox}>
+          <Ionicons name="lock-closed-outline" size={42} color={theme.text3} />
+
+          <Text style={[s.emptyTitle, { color: theme.text }]}>
+            Please sign in again
+          </Text>
+        </View>
       ) : (
         <>
           <FlatList
@@ -456,6 +603,26 @@ export default function UserManager() {
           />
         </>
       )}
+
+      <PrettyAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        onClose={closeAlert}
+      />
+
+      <PrettyAlert
+        visible={confirm.visible}
+        title={confirm.title}
+        message={confirm.message}
+        type={confirm.type}
+        showCancel
+        cancelText="Cancel"
+        confirmText={confirm.confirmText}
+        onClose={closeConfirm}
+        onConfirm={runConfirm}
+      />
     </View>
   );
 }
@@ -477,6 +644,19 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 4,
     borderRadius: 12,
+  },
+
+  emptyBox: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 24,
+  },
+
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: "800",
   },
 
   card: {
