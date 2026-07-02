@@ -169,3 +169,33 @@ a
 The purpose of Cheshire Shelf Mobile is to demonstrate how a mobile application can combine a customer bookstore experience with a complete admin management system.
 
 It brings together frontend development, backend integration, authentication, real-time communication, and mobile-specific storage into one practical application.
+
+## Environment Configuration
+
+The frontend uses an API base URL to communicate with the backend.
+
+## Example environment variable:
+
+VITE_API_URL=http://cheshireshelfapp-env.eba-pzcyg6yq.eu-north-1.elasticbeanstalk.com
+
+The value can be changed depending on the backend environment.
+
+## Production Deployment
+
+The production version is deployed to AWS S3 using the configured CI/CD pipeline.
+
+For local production build testing:
+
+```bash
+npm run build
+```
+
+The generated production files are placed inside the dist folder.
+
+In the deployed workflow, GitHub Actions handles the build and upload process automatically.
+
+### Project Purpose
+
+The purpose of Cheshire Shelf Web is to demonstrate how a modern React application can work as a complete frontend for an online bookstore system.
+
+It brings together customer-facing e-commerce features, admin management tools, backend API integration, authentication, real-time communication, multilingual support, AWS hosting, and CI/CD deployment in one project.
