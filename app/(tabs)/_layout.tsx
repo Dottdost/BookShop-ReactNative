@@ -19,8 +19,8 @@ import {
 } from "react-native";
 
 const STATUS_BAR_HEIGHT = Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0;
-const HEADER_SAFE_TOP = Platform.OS === "android" ? STATUS_BAR_HEIGHT + 34 : 22;
-const HEADER_HEIGHT = Platform.OS === "android" ? STATUS_BAR_HEIGHT + 122 : 112;
+const HEADER_SAFE_TOP = Platform.OS === "android" ? STATUS_BAR_HEIGHT + 44 : 38;
+const HEADER_HEIGHT = Platform.OS === "android" ? STATUS_BAR_HEIGHT + 142 : 132;
 
 function CheshireGif() {
   return (
@@ -199,7 +199,7 @@ function CustomHeader() {
         >
           <Ionicons
             name={theme.dark ? "sunny-outline" : "moon-outline"}
-            size={20}
+            size={24}
             color={theme.accent}
           />
         </TouchableOpacity>
@@ -208,7 +208,7 @@ function CustomHeader() {
           style={[styles.iconBtn, { backgroundColor: theme.accentBg }]}
           onPress={() => navigation.navigate("profile")}
         >
-          <Ionicons name="person-outline" size={20} color={theme.text} />
+          <Ionicons name="person-outline" size={24} color={theme.text} />
         </TouchableOpacity>
       </View>
     </View>
@@ -377,24 +377,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 14,
-    paddingBottom: 20,
+    paddingBottom: 26,
     borderBottomWidth: 1,
   },
 
   logoBtn: {
     position: "absolute",
     left: "50%",
-    marginLeft: -68,
-    width: 136,
-    height: 70,
+    marginLeft: -76,
+    width: 152,
+    height: 80,
     justifyContent: "center",
     alignItems: "center",
-    bottom: 20,
+    bottom: 24,
   },
 
   gifWrap: {
-    width: 136,
-    height: 70,
+    width: 152,
+    height: 80,
     borderRadius: 0,
     overflow: "visible",
     justifyContent: "center",
@@ -403,37 +403,37 @@ const styles = StyleSheet.create({
   },
 
   cheshireGif: {
-    width: 136,
-    height: 70,
+    width: 152,
+    height: 80,
     opacity: 0.98,
   },
 
   headerRight: {
     flexDirection: "row",
-    gap: 8,
+    gap: 10,
     alignItems: "center",
   },
 
   iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     justifyContent: "center",
     alignItems: "center",
   },
 
   burgerBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     justifyContent: "center",
     alignItems: "center",
-    gap: 5,
+    gap: 6,
   },
 
   line: {
-    width: 18,
-    height: 2,
-    borderRadius: 2,
+    width: 24,
+    height: 3,
+    borderRadius: 3,
   },
 });
