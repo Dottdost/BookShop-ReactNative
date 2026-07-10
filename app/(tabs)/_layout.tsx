@@ -18,7 +18,9 @@ import {
   View,
 } from "react-native";
 
-const ANDROID_TOP = Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0;
+const STATUS_BAR_HEIGHT = Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0;
+const HEADER_SAFE_TOP = Platform.OS === "android" ? STATUS_BAR_HEIGHT + 18 : 14;
+const HEADER_HEIGHT = Platform.OS === "android" ? STATUS_BAR_HEIGHT + 86 : 92;
 
 function CheshireGif() {
   return (
@@ -168,8 +170,8 @@ function CustomHeader() {
       style={[
         styles.header,
         {
-          paddingTop: ANDROID_TOP,
-          height: 68 + ANDROID_TOP,
+          height: HEADER_HEIGHT,
+          paddingTop: HEADER_SAFE_TOP,
           backgroundColor: theme.headerBg,
           borderBottomColor: theme.border,
         },
@@ -375,6 +377,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 14,
+    paddingBottom: 14,
     borderBottomWidth: 1,
   },
 
@@ -383,15 +386,15 @@ const styles = StyleSheet.create({
     left: "50%",
     marginLeft: -46,
     width: 92,
-    height: 48,
+    height: 52,
     justifyContent: "center",
     alignItems: "center",
-    bottom: 10,
+    bottom: 16,
   },
 
   gifWrap: {
     width: 92,
-    height: 48,
+    height: 52,
     borderRadius: 18,
     overflow: "visible",
     justifyContent: "center",
