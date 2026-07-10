@@ -17,19 +17,67 @@ import {
 import cartStorage from "../../hooks/cartStorage";
 import wishlistStorage from "../../hooks/wishlistStorage";
 
+type BookResponse = Record<string, unknown>;
+
+type Book = {
+  id?: string | number;
+  bookId?: string | number;
+  Id?: string | number;
+  BookId?: string | number;
+  title?: string;
+  Title?: string;
+  author?: string;
+  Author?: string;
+  imageUrl?: string;
+  ImageUrl?: string;
+  price?: number;
+  Price?: number;
+  stock?: number;
+  description?: string;
+  genreName?: string;
+  publisherName?: string;
+};
+
 function getParamId(value: string | string[] | undefined) {
   if (Array.isArray(value)) return value[0] || "";
   return value || "";
 }
 
-function unwrapBook(data: any) {
-  return data?.data ?? data?.book ?? data;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
 }
 
-function getBookId(book: any, fallback = "") {
+function unwrapBook(data: unknown): Book {
+  if (!isRecord(data)) return {};
+
+  const response = data as BookResponse;
+  const nested = response.data ?? response.book;
+
+  if (isRecord(nested)) return nested as Book;
+
+  return response as Book;
+}
+
+function getBookId(book: Book | null, fallback = "") {
   return String(
     book?.id ?? book?.bookId ?? book?.Id ?? book?.BookId ?? fallback ?? "",
   );
+}
+
+function getBookTitle(book: Book) {
+  return String(book.title ?? book.Title ?? "");
+}
+
+function getBookAuthor(book: Book) {
+  return String(book.author ?? book.Author ?? "");
+}
+
+function getBookImage(book: Book) {
+  return String(book.imageUrl ?? book.ImageUrl ?? "");
+}
+
+function getBookPrice(book: Book) {
+  return Number(book.price ?? book.Price ?? 0);
 }
 
 function SkeletonLoader() {
@@ -51,7 +99,7 @@ function SkeletonLoader() {
         }),
       ]),
     ).start();
-  }, []);
+  }, [shimmer]);
 
   const bg = shimmer.interpolate({
     inputRange: [0, 1],
@@ -59,7 +107,7 @@ function SkeletonLoader() {
   });
 
   return (
-    <View style={[styles.skeletonContainer, { backgroundColor: theme.bg }]}>
+    <View style={[styles.skeletonContainer, { backgroundColor: theme.bg }]}> 
       <Animated.View style={[styles.skeletonImage, { backgroundColor: bg }]} />
 
       <View style={styles.skeletonContent}>
@@ -92,7 +140,7 @@ export default function BookDetails() {
 
   const bookId = getParamId(id);
 
-  const [book, setBook] = useState<any>(null);
+  const [book, setBook] = useState<Book | null>(null);
   const [added, setAdded] = useState(false);
   const [liked, setLiked] = useState(false);
 
@@ -204,10 +252,10 @@ export default function BookDetails() {
       await cartStorage.addAsync(
         {
           bookId: currentBookId,
-          title: String(book.title ?? book.Title ?? ""),
-          author: String(book.author ?? book.Author ?? ""),
-          imageUrl: String(book.imageUrl ?? book.ImageUrl ?? ""),
-          price: Number(book.price ?? book.Price ?? 0),
+          title: getBookTitle(book),
+          author: getBookAuthor(book),
+          imageUrl: getBookImage(book),
+          price: getBookPrice(book),
         },
         userId,
       );
@@ -259,6 +307,10 @@ export default function BookDetails() {
     ]).start();
   };
 
+  const handleBackToBooks = () => {
+    router.replace("/books");
+  };
+
   const heartRotateDeg = heartRotate.interpolate({
     inputRange: [-1, 0, 1],
     outputRange: ["-15deg", "0deg", "15deg"],
@@ -266,18 +318,20 @@ export default function BookDetails() {
 
   if (!book) return <SkeletonLoader />;
 
+  const title = getBookTitle(book);
+  const author = getBookAuthor(book);
+  const price = getBookPrice(book);
+  const imageUrl = getBookImage(book);
+
   return (
-    <View style={[styles.root, { backgroundColor: theme.bg }]}>
+    <View style={[styles.root, { backgroundColor: theme.bg }]}> 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <Animated.View
           style={[styles.imageWrapper, { transform: [{ scale: scaleImg }] }]}
         >
           <Image
             source={{
-              uri:
-                book.imageUrl ||
-                book.ImageUrl ||
-                "https://placehold.co/360x520/241633/d8b4fe?text=Book",
+              uri: imageUrl || "https://placehold.co/360x520/241633/d8b4fe?text=Book",
             }}
             style={styles.image}
           />
@@ -294,7 +348,7 @@ export default function BookDetails() {
           />
 
           <View style={styles.priceBadge}>
-            <Text style={styles.priceBadgeText}>${book.price ?? 0}</Text>
+            <Text style={styles.priceBadgeText}>${price}</Text>
           </View>
 
           <TouchableOpacity
@@ -335,7 +389,7 @@ export default function BookDetails() {
               >
                 <Ionicons name="bookmark" size={11} color={theme.accent} />
 
-                <Text style={[styles.tagText, { color: theme.accent }]}>
+                <Text style={[styles.tagText, { color: theme.accent }]}> 
                   {book.genreName}
                 </Text>
               </View>
@@ -349,7 +403,7 @@ export default function BookDetails() {
             >
               <Ionicons name="layers-outline" size={11} color={theme.accent} />
 
-              <Text style={[styles.tagText, { color: theme.accent }]}>
+              <Text style={[styles.tagText, { color: theme.accent }]}> 
                 {t("bookDetails.inStock", { count: book.stock ?? 0 })}
               </Text>
             </View>
@@ -370,19 +424,17 @@ export default function BookDetails() {
                   color={theme.accent}
                 />
 
-                <Text style={[styles.tagText, { color: theme.accent }]}>
+                <Text style={[styles.tagText, { color: theme.accent }]}> 
                   {book.publisherName}
                 </Text>
               </View>
             )}
           </View>
 
-          <Text style={[styles.title, { color: theme.text }]}>
-            {book.title}
-          </Text>
+          <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
 
-          <Text style={[styles.author, { color: theme.text2 }]}>
-            {t("bookDetails.byAuthor", { author: book.author })}
+          <Text style={[styles.author, { color: theme.text2 }]}> 
+            {t("bookDetails.byAuthor", { author })}
           </Text>
 
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
@@ -396,12 +448,12 @@ export default function BookDetails() {
             <View style={styles.descHeader}>
               <Ionicons name="reader-outline" size={16} color={theme.accent} />
 
-              <Text style={[styles.sectionLabel, { color: theme.accent }]}>
+              <Text style={[styles.sectionLabel, { color: theme.accent }]}> 
                 {t("bookDetails.description")}
               </Text>
             </View>
 
-            <Text style={[styles.description, { color: theme.text2 }]}>
+            <Text style={[styles.description, { color: theme.text2 }]}> 
               {book.description || "No description"}
             </Text>
           </View>
@@ -415,12 +467,12 @@ export default function BookDetails() {
             <View style={styles.detailRow}>
               <Ionicons name="person-outline" size={16} color={theme.text3} />
 
-              <Text style={[styles.detailLabel, { color: theme.text3 }]}>
+              <Text style={[styles.detailLabel, { color: theme.text3 }]}> 
                 {t("bookDetails.author")}
               </Text>
 
-              <Text style={[styles.detailValue, { color: theme.text }]}>
-                {book.author}
+              <Text style={[styles.detailValue, { color: theme.text }]}> 
+                {author}
               </Text>
             </View>
 
@@ -431,11 +483,11 @@ export default function BookDetails() {
             <View style={styles.detailRow}>
               <Ionicons name="bookmark-outline" size={16} color={theme.text3} />
 
-              <Text style={[styles.detailLabel, { color: theme.text3 }]}>
+              <Text style={[styles.detailLabel, { color: theme.text3 }]}> 
                 {t("bookDetails.genre")}
               </Text>
 
-              <Text style={[styles.detailValue, { color: theme.text }]}>
+              <Text style={[styles.detailValue, { color: theme.text }]}> 
                 {book.genreName || "—"}
               </Text>
             </View>
@@ -456,11 +508,11 @@ export default function BookDetails() {
                     color={theme.text3}
                   />
 
-                  <Text style={[styles.detailLabel, { color: theme.text3 }]}>
+                  <Text style={[styles.detailLabel, { color: theme.text3 }]}> 
                     {t("bookDetails.publisher")}
                   </Text>
 
-                  <Text style={[styles.detailValue, { color: theme.text }]}>
+                  <Text style={[styles.detailValue, { color: theme.text }]}> 
                     {book.publisherName}
                   </Text>
                 </View>
@@ -474,11 +526,11 @@ export default function BookDetails() {
             <View style={styles.detailRow}>
               <Ionicons name="cube-outline" size={16} color={theme.text3} />
 
-              <Text style={[styles.detailLabel, { color: theme.text3 }]}>
+              <Text style={[styles.detailLabel, { color: theme.text3 }]}> 
                 {t("bookDetails.stock")}
               </Text>
 
-              <Text style={[styles.detailValue, { color: theme.text }]}>
+              <Text style={[styles.detailValue, { color: theme.text }]}> 
                 {book.stock ?? 0}
               </Text>
             </View>
@@ -500,7 +552,7 @@ export default function BookDetails() {
       >
         <TouchableOpacity
           style={[styles.backBtn, { backgroundColor: theme.accentBg }]}
-          onPress={() => router.back()}
+          onPress={handleBackToBooks}
         >
           <Ionicons name="chevron-back" size={22} color={theme.accent} />
         </TouchableOpacity>
