@@ -8,6 +8,8 @@ import {
   onReceiveMessage,
 } from "@/services/signalr";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -31,7 +33,8 @@ type Chat = {
   status?: string | number;
   createdAt?: string;
   closedAt?: string | null;
-  messages?: any;
+  lastMessage?: string | null;
+  messages?: unknown;
   user?: {
     id?: string;
     userName?: string;
@@ -45,15 +48,63 @@ type Message = {
   message?: string;
   content?: string;
   senderId?: string;
+  senderUserId?: string;
   userId?: string;
   createdAt?: string;
   sentAt?: string;
 };
 
+type AuthSnapshot = {
+  token: string | null;
+  userId: string | null;
+};
+
+type ValuesResponse<T> = {
+  $values?: T[];
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
 function authH(token: string | null) {
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token ?? ""}`,
+  };
+}
+
+async function getStoredValue(key: string) {
+  if (Platform.OS === "web") {
+    if (typeof localStorage === "undefined") return null;
+
+    return localStorage.getItem(key);
+  }
+
+  try {
+    const secureValue = await SecureStore.getItemAsync(key);
+
+    if (secureValue) return secureValue;
+  } catch (error) {
+    console.log(`SecureStore ${key} read failed:`, error);
+  }
+
+  try {
+    return await AsyncStorage.getItem(key);
+  } catch (error) {
+    console.log(`AsyncStorage ${key} read failed:`, error);
+    return null;
+  }
+}
+
+async function getStoredAuthSnapshot(): Promise<AuthSnapshot> {
+  const token =
+    (await getStoredValue("token")) || (await getStoredValue("accessToken"));
+  const userId = await getStoredValue("userId");
+
+  return {
+    token,
+    userId,
   };
 }
 
@@ -63,40 +114,73 @@ async function readResponse(res: Response) {
   if (!text) return { text: "", data: null };
 
   try {
-    return { text, data: JSON.parse(text) };
+    return { text, data: JSON.parse(text) as unknown };
   } catch {
     return { text, data: null };
   }
 }
 
-function unwrapArray(data: any): any[] {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.$values)) return data.$values;
-  if (Array.isArray(data?.data)) return data.data;
-  if (Array.isArray(data?.data?.$values)) return data.data.$values;
-  if (Array.isArray(data?.messages)) return data.messages;
-  if (Array.isArray(data?.messages?.$values)) return data.messages.$values;
+function unwrapArray<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[];
+  if (!isRecord(data)) return [];
+
+  if (Array.isArray(data.$values)) return data.$values as T[];
+  if (Array.isArray(data.data)) return data.data as T[];
+  if (Array.isArray(data.items)) return data.items as T[];
+  if (Array.isArray(data.messages)) return data.messages as T[];
+
+  if (isRecord(data.data) && Array.isArray((data.data as ValuesResponse<T>).$values)) {
+    return (data.data as ValuesResponse<T>).$values ?? [];
+  }
+
+  if (
+    isRecord(data.items) &&
+    Array.isArray((data.items as ValuesResponse<T>).$values)
+  ) {
+    return (data.items as ValuesResponse<T>).$values ?? [];
+  }
+
+  if (
+    isRecord(data.messages) &&
+    Array.isArray((data.messages as ValuesResponse<T>).$values)
+  ) {
+    return (data.messages as ValuesResponse<T>).$values ?? [];
+  }
+
   return [];
 }
 
-function getChatId(chat: any): string {
-  return String(chat?.id ?? chat?.chatId ?? "");
+function getChatId(chat: unknown): string {
+  if (!isRecord(chat)) return "";
+
+  return String(chat.id ?? chat.chatId ?? "");
 }
 
-function isClosedChat(chat: any): boolean {
-  const status = String(chat?.status ?? "").toLowerCase();
-  return chat?.closedAt != null || status === "closed";
+function isClosedChat(chat: unknown): boolean {
+  if (!isRecord(chat)) return false;
+
+  const status = String(chat.status ?? "").toLowerCase();
+
+  return chat.closedAt != null || status === "closed";
 }
 
-function normalizeMessages(data: any): Message[] {
-  return unwrapArray(data)
-    .filter((x) => x && !x.$ref)
-    .map((m: any, index: number) => ({
-      id: String(m.id ?? m.messageId ?? `${index}-${m.sentAt ?? Date.now()}`),
-      text: m.text ?? m.message ?? m.content ?? "",
-      senderId: m.senderId ?? "",
-      userId: m.userId,
-      createdAt: m.createdAt ?? m.sentAt ?? "",
+function normalizeMessages(data: unknown): Message[] {
+  return unwrapArray<Record<string, unknown>>(data)
+    .filter((item) => item && !item.$ref)
+    .map((message, index) => ({
+      id: String(
+        message.id ??
+          message.messageId ??
+          `${index}-${String(message.sentAt ?? Date.now())}`,
+      ),
+      text: String(message.text ?? message.message ?? message.content ?? ""),
+      senderId: String(message.senderId ?? message.senderUserId ?? ""),
+      userId: message.userId ? String(message.userId) : undefined,
+      createdAt: message.createdAt
+        ? String(message.createdAt)
+        : message.sentAt
+          ? String(message.sentAt)
+          : "",
     }));
 }
 
@@ -104,23 +188,22 @@ function cleanError(text: string, fallback: string) {
   if (!text) return fallback;
 
   try {
-    const json = JSON.parse(text);
-    return json.title || json.message || text || fallback;
+    const json = JSON.parse(text) as Record<string, unknown>;
+
+    return String(json.title || json.message || text || fallback);
   } catch {
     return text || fallback;
   }
 }
 
-function pickActiveUserChat(data: any): Chat | null {
-  const chats = unwrapArray(data).filter((x) => x && !x.$ref && getChatId(x));
+function pickActiveUserChat(data: unknown): Chat | null {
+  const chats = unwrapArray<Chat>(data).filter(
+    (chat) => chat && getChatId(chat) && !isClosedChat(chat),
+  );
 
   if (chats.length === 0) return null;
 
-  const activeChats = chats.filter((chat) => !isClosedChat(chat));
-
-  if (activeChats.length === 0) return null;
-
-  return activeChats.sort(
+  return chats.sort(
     (a, b) =>
       new Date(b.createdAt ?? 0).getTime() -
       new Date(a.createdAt ?? 0).getTime(),
@@ -137,6 +220,10 @@ export default function SupportChatWidget() {
     loading: authLoading,
   } = useAuth();
 
+  const [storedAuth, setStoredAuth] = useState<AuthSnapshot>({
+    token: null,
+    userId: null,
+  });
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [chat, setChat] = useState<Chat | null>(null);
@@ -149,7 +236,32 @@ export default function SupportChatWidget() {
   const catFloat = useRef(new Animated.Value(0)).current;
   const listRef = useRef<FlatList<Message>>(null);
 
+  const effectiveToken = token || storedAuth.token;
+  const effectiveUserId = userId || storedAuth.userId;
   const chatId = getChatId(chat);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadStoredAuth() {
+      const snapshot = await getStoredAuthSnapshot();
+
+      if (!mounted) return;
+
+      setStoredAuth(snapshot);
+    }
+
+    void loadStoredAuth();
+
+    const interval = setInterval(() => {
+      void loadStoredAuth();
+    }, 1000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     Animated.loop(
@@ -169,17 +281,17 @@ export default function SupportChatWidget() {
   }, [catFloat]);
 
   useEffect(() => {
-    if (!open || !chatId || !token || isAdmin || isSuperAdmin) return;
+    if (!open || !chatId || !effectiveToken || isAdmin || isSuperAdmin) return;
 
     const interval = setInterval(() => {
-      loadMessages(chatId, false);
+      void loadMessages(chatId, false, effectiveToken);
     }, 7000);
 
     return () => clearInterval(interval);
-  }, [open, chatId, token, isAdmin, isSuperAdmin]);
+  }, [open, chatId, effectiveToken, isAdmin, isSuperAdmin]);
 
   useEffect(() => {
-    if (!open || !chatId || !token || isAdmin || isSuperAdmin) return;
+    if (!open || !chatId || !effectiveToken || isAdmin || isSuperAdmin) return;
 
     let mounted = true;
 
@@ -190,7 +302,7 @@ export default function SupportChatWidget() {
         if (!mounted) return;
 
         await onReceiveMessage(() => {
-          loadMessages(chatId, false);
+          void loadMessages(chatId, false, effectiveToken);
         });
       } catch (e) {
         console.log("SignalR chat connection failed:", e);
@@ -204,7 +316,7 @@ export default function SupportChatWidget() {
       offReceiveMessage().catch(() => {});
       leaveChatGroup(chatId).catch(() => {});
     };
-  }, [open, chatId, token, isAdmin, isSuperAdmin]);
+  }, [open, chatId, effectiveToken, isAdmin, isSuperAdmin]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -223,12 +335,28 @@ export default function SupportChatWidget() {
     outputRange: [0, -5],
   });
 
-  async function getMyChat(): Promise<Chat | null> {
-    if (!token) return null;
+  async function getCurrentAuth() {
+    const freshStoredAuth = await getStoredAuthSnapshot();
+    const freshToken = token || storedAuth.token || freshStoredAuth.token;
+    const freshUserId = userId || storedAuth.userId || freshStoredAuth.userId;
 
+    if (freshToken !== storedAuth.token || freshUserId !== storedAuth.userId) {
+      setStoredAuth({
+        token: freshToken,
+        userId: freshUserId,
+      });
+    }
+
+    return {
+      token: freshToken,
+      userId: freshUserId,
+    };
+  }
+
+  async function getMyChat(activeToken: string): Promise<Chat | null> {
     const res = await fetch(`${API_URL}/api/chat/my`, {
       method: "GET",
-      headers: authH(token),
+      headers: authH(activeToken),
     });
 
     const { text, data } = await readResponse(res);
@@ -240,12 +368,10 @@ export default function SupportChatWidget() {
     return pickActiveUserChat(data);
   }
 
-  async function createChat(): Promise<Chat> {
-    if (!token) throw new Error("Please sign in to use support chat.");
-
+  async function createChat(activeToken: string): Promise<Chat> {
     const res = await fetch(`${API_URL}/api/chat/create`, {
       method: "POST",
-      headers: authH(token),
+      headers: authH(activeToken),
     });
 
     const { text, data } = await readResponse(res);
@@ -258,16 +384,22 @@ export default function SupportChatWidget() {
       throw new Error("Created chat has no id.");
     }
 
-    return data;
+    return data as Chat;
   }
 
-  async function loadMessages(id: string, showError = true) {
-    if (!token) return;
+  async function loadMessages(
+    id: string,
+    showError = true,
+    tokenOverride?: string | null,
+  ) {
+    const activeToken = tokenOverride || effectiveToken;
+
+    if (!activeToken) return;
 
     try {
       const res = await fetch(`${API_URL}/api/chat/${id}/messages`, {
         method: "GET",
-        headers: authH(token),
+        headers: authH(activeToken),
       });
 
       const { text, data } = await readResponse(res);
@@ -279,15 +411,17 @@ export default function SupportChatWidget() {
       }
 
       setMessages(normalizeMessages(data));
-    } catch (e: any) {
+    } catch (e) {
       if (showError) {
-        setError(e?.message || "Failed to load messages.");
+        setError(e instanceof Error ? e.message : "Failed to load messages.");
       }
     }
   }
 
   async function openChat() {
-    if (!token) {
+    const auth = await getCurrentAuth();
+
+    if (!auth.token) {
       setOpen(true);
       setError("Please sign in to use support chat.");
       return;
@@ -299,18 +433,18 @@ export default function SupportChatWidget() {
       setLoading(true);
       setError("");
 
-      let currentChat = await getMyChat();
+      let currentChat = await getMyChat(auth.token);
 
       if (!currentChat) {
-        currentChat = await createChat();
+        currentChat = await createChat(auth.token);
       }
 
       setChat(currentChat);
 
       const id = getChatId(currentChat);
-      await loadMessages(id);
-    } catch (e: any) {
-      setError(e?.message || "Something went wrong.");
+      await loadMessages(id, true, auth.token);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -327,8 +461,9 @@ export default function SupportChatWidget() {
   async function sendMessage() {
     const text = input.trim();
     const id = getChatId(chat);
+    const auth = await getCurrentAuth();
 
-    if (!text || !id || !token) return;
+    if (!text || !id || !auth.token) return;
 
     try {
       setSending(true);
@@ -338,7 +473,7 @@ export default function SupportChatWidget() {
       const optimistic: Message = {
         id: `local-${Date.now()}`,
         text,
-        senderId: chat?.userId ?? userId ?? "me",
+        senderId: chat?.userId ?? auth.userId ?? "me",
         createdAt: new Date().toISOString(),
       };
 
@@ -346,7 +481,7 @@ export default function SupportChatWidget() {
 
       const res = await fetch(`${API_URL}/api/chat/send-message`, {
         method: "POST",
-        headers: authH(token),
+        headers: authH(auth.token),
         body: JSON.stringify({
           chatId: id,
           text,
@@ -359,9 +494,9 @@ export default function SupportChatWidget() {
         throw new Error(cleanError(responseText, `Send failed ${res.status}`));
       }
 
-      await loadMessages(id, false);
-    } catch (e: any) {
-      setError(e?.message || "Message was not sent.");
+      await loadMessages(id, false, auth.token);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Message was not sent.");
     } finally {
       setSending(false);
     }
@@ -369,10 +504,12 @@ export default function SupportChatWidget() {
 
   const renderMessage = ({ item }: { item: Message }) => {
     const messageText = item.text ?? item.message ?? item.content ?? "";
+    const senderId = item.senderId ?? item.senderUserId ?? "";
 
     const isMine =
-      (!!chat?.userId && item.senderId === chat.userId) ||
-      item.senderId === "me";
+      (!!chat?.userId && senderId === chat.userId) ||
+      (!!effectiveUserId && senderId === effectiveUserId) ||
+      senderId === "me";
 
     return (
       <View
@@ -512,13 +649,9 @@ export default function SupportChatWidget() {
                 </View>
 
                 <View>
-                  <Text style={[styles.headerTitle, { color: theme.text }]}>
-                    Cheshire Support
-                  </Text>
+                  <Text style={[styles.headerTitle, { color: theme.text }]}>Cheshire Support</Text>
 
-                  <Text style={[styles.headerSub, { color: theme.text3 }]}>
-                    Ask anything about your order or books
-                  </Text>
+                  <Text style={[styles.headerSub, { color: theme.text3 }]}>Ask anything about your order or books</Text>
                 </View>
               </View>
 
@@ -574,13 +707,9 @@ export default function SupportChatWidget() {
                         color={theme.accent}
                       />
 
-                      <Text style={[styles.emptyTitle, { color: theme.text }]}>
-                        No messages yet
-                      </Text>
+                      <Text style={[styles.emptyTitle, { color: theme.text }]}>No messages yet</Text>
 
-                      <Text style={[styles.emptyText, { color: theme.text3 }]}>
-                        Start the conversation with our support team.
-                      </Text>
+                      <Text style={[styles.emptyText, { color: theme.text3 }]}>Start the conversation with our support team.</Text>
                     </View>
                   }
                 />
