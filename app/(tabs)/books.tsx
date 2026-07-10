@@ -32,6 +32,8 @@ interface Genre {
   name: string;
 }
 
+const BOOKS_PER_PAGE = 10;
+
 const wishlistStorage = {
   _key: (): string => {
     if (Platform.OS !== "web") return "wishlist_guest";
@@ -264,15 +266,14 @@ function BookCard({ item, isLoggedIn }: { item: Book; isLoggedIn: boolean }) {
             {item.title}
           </Text>
 
-          <Text style={[styles.infoAuthor, { color: theme.text2 }]}>
+          <Text style={[styles.infoAuthor, { color: theme.text2 }]}> 
             {item.author}
           </Text>
 
           <View style={styles.genreRow}>
             <Ionicons name="bookmark-outline" size={11} color={theme.accent} />
 
-            <Text style={[styles.infoGenre, { color: theme.accent }]}>
-              {" "}
+            <Text style={[styles.infoGenre, { color: theme.accent }]}> 
               {item.genreName || "No genre"}
             </Text>
           </View>
@@ -291,7 +292,7 @@ function BookCard({ item, isLoggedIn }: { item: Book; isLoggedIn: boolean }) {
         </Animated.View>
 
         {!flipped && (
-          <View style={[styles.staticInfo, { backgroundColor: theme.bg2 }]}>
+          <View style={[styles.staticInfo, { backgroundColor: theme.bg2 }]}> 
             <Text
               style={[styles.bookTitle, { color: theme.text }]}
               numberOfLines={1}
@@ -327,6 +328,7 @@ export default function Books() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const selectedGenreLabel =
     selectedGenre || t("booksScreen.allGenres") || "All genres";
@@ -346,7 +348,7 @@ export default function Books() {
         setError(null);
 
         const [booksRes, genresRes] = await Promise.all([
-          fetch(`${API_URL}/api/books?page=1&pageSize=50`),
+          fetch(`${API_URL}/api/books?page=1&pageSize=100`),
           fetch(`${API_URL}/api/genres/all`),
         ]);
 
@@ -401,6 +403,7 @@ export default function Books() {
     }
 
     setFiltered(result);
+    setCurrentPage(1);
   }, [search, selectedGenre, books]);
 
   const chooseGenre = (genreName: string | null) => {
@@ -408,8 +411,23 @@ export default function Books() {
     setGenreDropdownOpen(false);
   };
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / BOOKS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedBooks = filtered.slice(
+    (safeCurrentPage - 1) * BOOKS_PER_PAGE,
+    safeCurrentPage * BOOKS_PER_PAGE,
+  );
+  const canGoPrevious = safeCurrentPage > 1;
+  const canGoNext = safeCurrentPage < totalPages;
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}>
+    <View style={[styles.container, { backgroundColor: theme.bg }]}> 
       <View
         style={[
           styles.searchWrapper,
@@ -427,16 +445,14 @@ export default function Books() {
         />
 
         {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch("")}>
+          <TouchableOpacity onPress={() => setSearch("")}> 
             <Ionicons name="close-outline" size={20} color={theme.text3} />
           </TouchableOpacity>
         )}
       </View>
 
       <View style={styles.dropdownBlock}>
-        <Text style={[styles.dropdownLabel, { color: theme.text2 }]}>
-          Genre
-        </Text>
+        <Text style={[styles.dropdownLabel, { color: theme.text2 }]}>Genre</Text>
 
         <TouchableOpacity
           activeOpacity={0.85}
@@ -468,9 +484,7 @@ export default function Books() {
           </View>
 
           <Ionicons
-            name={
-              genreDropdownOpen ? "chevron-up-outline" : "chevron-down-outline"
-            }
+            name={genreDropdownOpen ? "chevron-up-outline" : "chevron-down-outline"}
             size={18}
             color={theme.accent}
           />
@@ -529,9 +543,7 @@ export default function Books() {
                       style={[
                         styles.dropdownItem,
                         {
-                          backgroundColor: active
-                            ? theme.accentBg
-                            : "transparent",
+                          backgroundColor: active ? theme.accentBg : "transparent",
                         },
                       ]}
                       onPress={() => chooseGenre(active ? null : genre.name)}
@@ -560,7 +572,7 @@ export default function Books() {
                   );
                 })
               ) : (
-                <Text style={[styles.emptyDropdown, { color: theme.text3 }]}>
+                <Text style={[styles.emptyDropdown, { color: theme.text3 }]}> 
                   No genres loaded
                 </Text>
               )}
@@ -570,7 +582,7 @@ export default function Books() {
       </View>
 
       {!loading && !error && (
-        <Text style={[styles.countText, { color: theme.text3 }]}>
+        <Text style={[styles.countText, { color: theme.text3 }]}> 
           {t("booksScreen.booksFound", { count: filtered.length })}
         </Text>
       )}
@@ -579,7 +591,7 @@ export default function Books() {
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.accent} />
 
-          <Text style={[styles.loadingText, { color: theme.text3 }]}>
+          <Text style={[styles.loadingText, { color: theme.text3 }]}> 
             {t("booksScreen.loadingBooks")}
           </Text>
         </View>
@@ -589,7 +601,7 @@ export default function Books() {
 
           <Text style={styles.errorText}>{error}</Text>
 
-          <Text style={[styles.errorHint, { color: theme.text3 }]}>
+          <Text style={[styles.errorHint, { color: theme.text3 }]}> 
             {t("booksScreen.serverHint")}
           </Text>
         </View>
@@ -597,21 +609,76 @@ export default function Books() {
         <View style={styles.center}>
           <Ionicons name="book-outline" size={40} color={theme.text3} />
 
-          <Text style={[styles.emptyText, { color: theme.text3 }]}>
+          <Text style={[styles.emptyText, { color: theme.text3 }]}> 
             {t("booksScreen.empty")}
           </Text>
         </View>
       ) : (
         <FlatList
-          data={filtered}
+          data={paginatedBooks}
           keyExtractor={(item, index) => item.id || String(index)}
           numColumns={2}
           columnWrapperStyle={styles.row}
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={{ paddingBottom: 90 }}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <BookCard item={item} isLoggedIn={isLoggedIn} />
           )}
+          ListFooterComponent={
+            totalPages > 1 ? (
+              <View style={styles.pagination}>
+                <TouchableOpacity
+                  disabled={!canGoPrevious}
+                  onPress={() =>
+                    setCurrentPage((page) => Math.max(1, page - 1))
+                  }
+                  style={[
+                    styles.pageButton,
+                    {
+                      backgroundColor: canGoPrevious ? theme.accent : theme.bg3,
+                      opacity: canGoPrevious ? 1 : 0.55,
+                    },
+                  ]}
+                >
+                  <Ionicons name="chevron-back-outline" size={19} color="white" />
+                </TouchableOpacity>
+
+                <View
+                  style={[
+                    styles.pageInfo,
+                    {
+                      backgroundColor: theme.bg2,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.pageInfoText, { color: theme.text }]}> 
+                    {safeCurrentPage} / {totalPages}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  disabled={!canGoNext}
+                  onPress={() =>
+                    setCurrentPage((page) => Math.min(totalPages, page + 1))
+                  }
+                  style={[
+                    styles.pageButton,
+                    {
+                      backgroundColor: canGoNext ? theme.accent : theme.bg3,
+                      opacity: canGoNext ? 1 : 0.55,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="chevron-forward-outline"
+                    size={19}
+                    color="white"
+                  />
+                </TouchableOpacity>
+              </View>
+            ) : null
+          }
         />
       )}
     </View>
@@ -841,6 +908,39 @@ const styles = StyleSheet.create({
 
   row: {
     justifyContent: "space-between",
+  },
+
+  pagination: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 8,
+    marginBottom: 20,
+  },
+
+  pageButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  pageInfo: {
+    minWidth: 82,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+
+  pageInfoText: {
+    fontSize: 14,
+    fontWeight: "900",
   },
 
   center: {
