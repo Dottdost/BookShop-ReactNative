@@ -140,13 +140,13 @@ export function useAuth(): AuthState {
       }
     });
 
-    const interval = window.setInterval(() => {
+    const interval = setInterval(() => {
       void loadAuth();
     }, 1200);
 
     return () => {
       subscription.remove();
-      window.clearInterval(interval);
+      clearInterval(interval);
     };
   }, [loadAuth]);
 
