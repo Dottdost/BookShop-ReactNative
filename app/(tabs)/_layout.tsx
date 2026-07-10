@@ -11,10 +11,14 @@ import { useTranslation } from "react-i18next";
 import {
   Animated,
   Image,
+  Platform,
+  StatusBar,
   StyleSheet,
   TouchableOpacity,
   View,
 } from "react-native";
+
+const ANDROID_TOP = Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0;
 
 function CheshireGif() {
   return (
@@ -22,7 +26,7 @@ function CheshireGif() {
       <Image
         source={require("../../assets/images/sticker.webp")}
         style={styles.cheshireGif}
-        resizeMode="cover"
+        resizeMode="contain"
       />
     </View>
   );
@@ -155,8 +159,8 @@ function BurgerButton({
   );
 }
 
-function CustomHeader({ title }: { title: string }) {
-  const navigation = useNavigation<DrawerNavigationProp<any>>();
+function CustomHeader() {
+  const navigation = useNavigation<DrawerNavigationProp<Record<string, object | undefined>>>();
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -164,6 +168,8 @@ function CustomHeader({ title }: { title: string }) {
       style={[
         styles.header,
         {
+          paddingTop: ANDROID_TOP,
+          height: 68 + ANDROID_TOP,
           backgroundColor: theme.headerBg,
           borderBottomColor: theme.border,
         },
@@ -175,7 +181,7 @@ function CustomHeader({ title }: { title: string }) {
       />
 
       <TouchableOpacity
-        onPress={() => navigation.navigate("index" as any)}
+        onPress={() => navigation.navigate("index")}
         activeOpacity={0.8}
         style={styles.logoBtn}
       >
@@ -219,9 +225,7 @@ export default function Layout() {
       <Drawer
         screenOptions={{
           headerShown: true,
-          header: ({ options }) => (
-            <CustomHeader title={options.title ?? t("app.name")} />
-          ),
+          header: () => <CustomHeader />,
           drawerStyle: {
             backgroundColor: theme.drawerBg,
             width: 260,
@@ -288,7 +292,7 @@ export default function Layout() {
         <Drawer.Screen
           name="orders"
           options={{
-            title: t("profileScreen.myOrders") || "My Orders",
+            title: t("profileScreen.myOrders"),
             drawerItemStyle: { display: "none" },
           }}
         />
@@ -367,7 +371,6 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    height: 72,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -378,32 +381,34 @@ const styles = StyleSheet.create({
   logoBtn: {
     position: "absolute",
     left: "50%",
-    marginLeft: -34,
-    width: 68,
-    height: 42,
+    marginLeft: -46,
+    width: 92,
+    height: 48,
     justifyContent: "center",
     alignItems: "center",
+    bottom: 10,
   },
 
   gifWrap: {
-    width: 68,
-    height: 34,
+    width: 92,
+    height: 48,
     borderRadius: 18,
-    overflow: "hidden",
+    overflow: "visible",
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "transparent",
   },
 
   cheshireGif: {
-    width: 86,
-    height: 48,
-    opacity: 0.92,
+    width: 104,
+    height: 58,
+    opacity: 0.95,
   },
 
   headerRight: {
     flexDirection: "row",
     gap: 8,
+    alignItems: "center",
   },
 
   iconBtn: {
