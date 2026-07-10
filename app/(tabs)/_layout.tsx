@@ -19,8 +19,8 @@ import {
 } from "react-native";
 
 const STATUS_BAR_HEIGHT = Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0;
-const HEADER_SAFE_TOP = Platform.OS === "android" ? STATUS_BAR_HEIGHT + 18 : 14;
-const HEADER_HEIGHT = Platform.OS === "android" ? STATUS_BAR_HEIGHT + 86 : 92;
+const HEADER_SAFE_TOP = Platform.OS === "android" ? STATUS_BAR_HEIGHT + 34 : 22;
+const HEADER_HEIGHT = Platform.OS === "android" ? STATUS_BAR_HEIGHT + 122 : 112;
 
 function CheshireGif() {
   return (
@@ -377,25 +377,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 14,
-    paddingBottom: 14,
+    paddingBottom: 20,
     borderBottomWidth: 1,
   },
 
   logoBtn: {
     position: "absolute",
     left: "50%",
-    marginLeft: -46,
-    width: 92,
-    height: 52,
+    marginLeft: -68,
+    width: 136,
+    height: 70,
     justifyContent: "center",
     alignItems: "center",
-    bottom: 16,
+    bottom: 20,
   },
 
   gifWrap: {
-    width: 92,
-    height: 52,
-    borderRadius: 18,
+    width: 136,
+    height: 70,
+    borderRadius: 0,
     overflow: "visible",
     justifyContent: "center",
     alignItems: "center",
@@ -403,9 +403,9 @@ const styles = StyleSheet.create({
   },
 
   cheshireGif: {
-    width: 104,
-    height: 58,
-    opacity: 0.95,
+    width: 136,
+    height: 70,
+    opacity: 0.98,
   },
 
   headerRight: {
