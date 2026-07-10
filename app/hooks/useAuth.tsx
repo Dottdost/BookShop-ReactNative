@@ -2,11 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
-import { useCallback, useState } from "react";
-import { Platform } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState, Platform } from "react-native";
 
 type JwtPayload = {
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type AuthState = {
@@ -18,7 +18,7 @@ type AuthState = {
   loading: boolean;
 };
 
-function normalizeRoles(rawRoles: any): string[] {
+function normalizeRoles(rawRoles: unknown): string[] {
   if (!rawRoles) return [];
 
   if (Array.isArray(rawRoles)) {
@@ -62,6 +62,31 @@ async function getStoredValue(key: string) {
   return AsyncStorage.getItem(key);
 }
 
+async function getStoredAuth() {
+  const token =
+    (await getStoredValue("token")) || (await getStoredValue("accessToken"));
+
+  const userId = await getStoredValue("userId");
+  const roles = getRolesFromToken(token);
+
+  return {
+    token,
+    userId,
+    roles,
+    isAdmin:
+      roles.includes("Admin") ||
+      roles.includes("AppAdmin") ||
+      roles.includes("SuperAdmin"),
+    isSuperAdmin: roles.includes("SuperAdmin"),
+  };
+}
+
+function areStringArraysEqual(first: string[], second: string[]) {
+  if (first.length !== second.length) return false;
+
+  return first.every((item, index) => item === second[index]);
+}
+
 export function useAuth(): AuthState {
   const [state, setState] = useState<AuthState>({
     isAdmin: false,
@@ -72,27 +97,35 @@ export function useAuth(): AuthState {
     loading: true,
   });
 
-  const loadAuth = useCallback(async () => {
-    const token =
-      (await getStoredValue("token")) || (await getStoredValue("accessToken"));
-    const userId = await getStoredValue("userId");
+  const stateRef = useRef(state);
 
-    const roles = getRolesFromToken(token);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  const loadAuth = useCallback(async () => {
+    const auth = await getStoredAuth();
+    const current = stateRef.current;
+
+    const changed =
+      current.loading ||
+      current.token !== auth.token ||
+      current.userId !== auth.userId ||
+      current.isAdmin !== auth.isAdmin ||
+      current.isSuperAdmin !== auth.isSuperAdmin ||
+      !areStringArraysEqual(current.roles, auth.roles);
+
+    if (!changed) return;
 
     setState({
-      token,
-      userId,
-      roles,
+      ...auth,
       loading: false,
-
-      isAdmin:
-        roles.includes("Admin") ||
-        roles.includes("AppAdmin") ||
-        roles.includes("SuperAdmin"),
-
-      isSuperAdmin: roles.includes("SuperAdmin"),
     });
   }, []);
+
+  useEffect(() => {
+    void loadAuth();
+  }, [loadAuth]);
 
   useFocusEffect(
     useCallback(() => {
@@ -100,5 +133,26 @@ export function useAuth(): AuthState {
     }, [loadAuth]),
   );
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (status) => {
+      if (status === "active") {
+        void loadAuth();
+      }
+    });
+
+    const interval = window.setInterval(() => {
+      void loadAuth();
+    }, 1200);
+
+    return () => {
+      subscription.remove();
+      window.clearInterval(interval);
+    };
+  }, [loadAuth]);
+
   return state;
+}
+
+export default function UseAuthRoutePlaceholder() {
+  return null;
 }
